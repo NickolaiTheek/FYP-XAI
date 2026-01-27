@@ -3,7 +3,7 @@ import axios from 'axios';
 import { AlertTriangle, BrainCircuit, Search, ShieldAlert, ShieldCheck, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-// --- TYPE DEFINITIONS (Added these to fix errors) ---
+// --- TYPE DEFINITIONS ---
 interface Review {
   text: string;
   stars: number;
@@ -104,7 +104,6 @@ export default function Home() {
       {data && (
         <main className="max-w-5xl mx-auto animate-fade-in">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            {/* Fixed: Calculate mismatches from the review array directly to be accurate */}
             <MetricCard label="Trust Score" value={`${data.stats.trust_score}/100`} icon={<ShieldCheck className="text-blue-500" />} color="blue" />
             <MetricCard label="Genuine Reviews" value={data.stats.real} icon={<ShieldCheck className="text-green-500" />} color="green" />
             <MetricCard label="Suspicious Reviews" value={data.stats.fakes} icon={<ShieldAlert className="text-red-500" />} color="red" />
@@ -147,14 +146,15 @@ function MetricCard({ label, value, icon, color }: MetricCardProps) {
   );
 }
 
-// --- COMPONENT: AUDIT & EVIDENCE REPORT ---
+// --- COMPONENT: AUDIT & EVIDENCE REPORT (SAFE MODE) ---
 interface ReviewCardProps {
   review: Review;
   apiUrl: string;
 }
 
 function ReviewCard({ review, apiUrl }: ReviewCardProps) {
-  const [report, setReport] = useState<AuditReport | null>(null);
+  // 🛡️ Use 'any' to safely handle potentially partial/old data from backend
+  const [report, setReport] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleExplain = async () => {
@@ -163,10 +163,13 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
       const res = await axios.post(`${apiUrl}/explain`, { text: review.text });
       setReport(res.data);
     } catch (err) {
-      alert("Analysis failed.");
+      alert("Analysis failed. Please try again.");
     }
     setLoading(false);
   };
+
+  // 🛡️ VALIDATION CHECK: Ensure we have the "new" data structure before rendering
+  const isReportValid = report && report.summary && report.verdict && report.evidence;
 
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -187,7 +190,7 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
       {!report && <p className="text-gray-700 mb-4 leading-relaxed">{review.text}</p>}
 
       {/* 👇 THE NEW "AUDIT REPORT" UI */}
-      {report && (
+      {report && isReportValid && (
         <div className="bg-white rounded-lg border border-gray-300 overflow-hidden animate-fade-in mb-4">
 
           {/* A. EXECUTIVE HEADER */}
@@ -205,7 +208,8 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
             <div className="mb-6">
               <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">💡 Analysis Summary</h5>
               <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                {report.summary.split("**").map((part, i) =>
+                {/* Safe Split Check */}
+                {report.summary?.split("**").map((part: string, i: number) =>
                   i % 2 === 1 ? <strong key={i} className={report.verdict_color === 'red' ? 'text-red-700' : 'text-green-700'}>{part}</strong> : part
                 )}
               </p>
@@ -216,7 +220,7 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
               <div className="mb-6">
                 <h5 className="text-xs font-bold text-gray-400 uppercase mb-3">🔍 Top Suspicious Indicators</h5>
                 <div className="grid grid-cols-3 gap-3">
-                  {report.evidence.map((item, i) => (
+                  {report.evidence.map((item: any, i: number) => (
                     <div key={i} className="bg-gray-50 p-3 rounded border border-gray-200 text-center">
                       <span className="block text-lg font-bold text-gray-800 mb-1">"{item.word}"</span>
                       <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${item.color === 'red' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -232,7 +236,7 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
             <div>
               <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">📄 Annotated Review Text</h5>
               <div className="text-gray-600 text-sm leading-7 bg-gray-50 p-4 rounded border border-gray-200 font-mono">
-                {report.raw_explanation.map((item, i) => {
+                {report.raw_explanation?.map((item: any, i: number) => {
                   if (item.score > 0.05) return <span key={i} className="text-red-700 font-bold border-b-2 border-red-200" title="High Risk Term">{item.word} </span>;
                   if (item.score < -0.05) return <span key={i} className="text-green-700 font-bold border-b-2 border-green-200" title="Trust Signal">{item.word} </span>;
                   return <span key={i}>{item.word} </span>;
@@ -240,6 +244,17 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ⚠️ FALLBACK MESSAGE (Shows if backend is still updating) */}
+      {report && !isReportValid && (
+        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-4 text-sm text-yellow-800">
+          <div className="flex items-center gap-2 mb-2 font-bold">
+            <AlertTriangle size={16} /> System Update in Progress
+          </div>
+          <p>The AI Brain is currently restarting to apply the new Audit logic. Please wait 1-2 minutes for the Hugging Face server to finish building.</p>
+          <button onClick={() => setReport(null)} className="mt-3 text-xs bg-yellow-100 px-3 py-1 rounded hover:bg-yellow-200 font-semibold">Okay, I'll Wait</button>
         </div>
       )}
 
