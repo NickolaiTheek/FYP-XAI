@@ -117,43 +117,26 @@ function MetricCard({ label, value, icon, color }: MetricCardProps) {
   );
 }
 
-// --- REVIEW CARD (UPDATED) ---
-// 🆕 ADDED apiUrl prop here
-interface Review {
-  text: string;
-  stars: number;
-  is_fake: boolean;
-  is_mismatch: boolean;
-}
 
-interface ExplanationItem {
-  word: string;
-  score: number;
-}
-
-interface ReviewCardProps {
-  review: Review;
-  apiUrl: string;
-}
-
-function ReviewCard({ review, apiUrl }: ReviewCardProps) {
-  const [explanation, setExplanation] = useState<ExplanationItem[] | null>(null);
+// --- COMPONENT: AUDIT & EVIDENCE REPORT ---
+function ReviewCard({ review, apiUrl }) {
+  const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleExplain = async () => {
     setLoading(true);
     try {
-      // 🆕 UPDATED: Uses the passed apiUrl
       const res = await axios.post(`${apiUrl}/explain`, { text: review.text });
-      setExplanation(res.data.explanation);
+      setReport(res.data);
     } catch (err) {
-      alert("Backend Error: Could not generate explanation.");
+      alert("Analysis failed.");
     }
     setLoading(false);
   };
 
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+      {/* HEADER (Same as before) */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-xs font-bold ${review.is_fake ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -166,34 +149,72 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
         {review.is_mismatch && <span className="flex items-center gap-1 text-xs text-orange-600 font-medium bg-orange-50 px-2 py-1 rounded border border-orange-100"><AlertTriangle size={14} /> Mismatch Detected</span>}
       </div>
 
-      <div className="mb-4 text-gray-700 leading-relaxed text-lg">
-        {explanation ? (
-          <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
-            <div className="flex justify-between items-center mb-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">AI Analysis Mode</p>
-              <button onClick={() => setExplanation(null)} className="text-xs text-blue-500 hover:underline">Close XAI</button>
+      {/* DEFAULT TEXT VIEW (When report is closed) */}
+      {!report && <p className="text-gray-700 mb-4 leading-relaxed">{review.text}</p>}
+
+      {/* 👇 THE NEW "AUDIT REPORT" UI */}
+      {report && (
+        <div className="bg-white rounded-lg border border-gray-300 overflow-hidden animate-fade-in mb-4">
+
+          {/* A. EXECUTIVE HEADER */}
+          <div className={`p-4 border-b border-gray-200 flex justify-between items-center ${report.verdict_color === 'red' ? 'bg-red-50' : 'bg-green-50'}`}>
+            <div>
+              <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${report.verdict_color === 'red' ? 'text-red-800' : 'text-green-800'}`}>
+                🛡️ Credibility Audit: {report.verdict}
+              </h4>
             </div>
-            <div className="leading-8">
-              {explanation.map((item, i) => {
-                let style = {};
-                if (item.score > 0.1) style = { backgroundColor: "#fee2e2", color: "#991b1b", padding: "2px 4px", fontWeight: "500" };
-                if (item.score < -0.1) style = { backgroundColor: "#dcfce7", color: "#166534", padding: "2px 4px", fontWeight: "500" };
-                return <span key={i} style={style} className="rounded mx-0.5 transition-colors">{item.word} </span>;
-              })}
+            <button onClick={() => setReport(null)} className="text-xs font-bold text-gray-500 hover:text-black">CLOSE XAI</button>
+          </div>
+
+          <div className="p-5">
+            {/* B. ANALYSIS SUMMARY */}
+            <div className="mb-6">
+              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">💡 Analysis Summary</h5>
+              <p className="text-sm text-gray-800 leading-relaxed font-medium">
+                {/* Simple bold renderer */}
+                {report.summary.split("**").map((part, i) =>
+                  i % 2 === 1 ? <strong key={i} className={report.verdict_color === 'red' ? 'text-red-700' : 'text-green-700'}>{part}</strong> : part
+                )}
+              </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-gray-200 flex gap-6 text-xs text-gray-500">
-              <span className="flex items-center gap-2"><div className="w-3 h-3 bg-red-100 border border-red-200 rounded"></div> Words indicating Deception</span>
-              <span className="flex items-center gap-2"><div className="w-3 h-3 bg-green-100 border border-green-200 rounded"></div> Words indicating Authenticity</span>
+
+            {/* C. EVIDENCE CARDS (Only show if there is evidence) */}
+            {report.evidence && report.evidence.length > 0 && (
+              <div className="mb-6">
+                <h5 className="text-xs font-bold text-gray-400 uppercase mb-3">🔍 Top Suspicious Indicators</h5>
+                <div className="grid grid-cols-3 gap-3">
+                  {report.evidence.map((item, i) => (
+                    <div key={i} className="bg-gray-50 p-3 rounded border border-gray-200 text-center">
+                      <span className="block text-lg font-bold text-gray-800 mb-1">"{item.word}"</span>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${item.color === 'red' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                        {item.impact} Impact
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* D. ANNOTATED SOURCE TEXT */}
+            <div>
+              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">📄 Annotated Review Text</h5>
+              <div className="text-gray-600 text-sm leading-7 bg-gray-50 p-4 rounded border border-gray-200 font-mono">
+                {report.raw_explanation.map((item, i) => {
+                  // Underline style instead of background color for a cleaner "Report" look
+                  if (item.score > 0.05) return <span key={i} className="text-red-700 font-bold border-b-2 border-red-200" title="High Risk Term">{item.word} </span>;
+                  if (item.score < -0.05) return <span key={i} className="text-green-700 font-bold border-b-2 border-green-200" title="Trust Signal">{item.word} </span>;
+                  return <span key={i}>{item.word} </span>;
+                })}
+              </div>
             </div>
           </div>
-        ) : (
-          <p>{review.text}</p>
-        )}
-      </div>
+        </div>
+      )}
 
-      {!explanation && (
-        <button onClick={handleExplain} disabled={loading} className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg">
-          {loading ? "Analyzing..." : <><BrainCircuit size={18} /> Explain Why</>}
+      {/* BUTTON */}
+      {!report && (
+        <button onClick={handleExplain} disabled={loading} className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors">
+          {loading ? "Running Audit..." : <><BrainCircuit size={18} /> Run Analysis</>}
         </button>
       )}
     </div>
