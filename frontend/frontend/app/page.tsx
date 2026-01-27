@@ -3,6 +3,33 @@ import axios from 'axios';
 import { AlertTriangle, BrainCircuit, Search, ShieldAlert, ShieldCheck, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+// --- TYPE DEFINITIONS (Added these to fix errors) ---
+interface Review {
+  text: string;
+  stars: number;
+  is_fake: boolean;
+  is_mismatch: boolean;
+}
+
+interface EvidenceItem {
+  word: string;
+  impact: string;
+  color: string;
+}
+
+interface RawExplanationItem {
+  word: string;
+  score: number;
+}
+
+interface AuditReport {
+  risk_score: number;
+  verdict: string;
+  verdict_color: string;
+  summary: string;
+  evidence: EvidenceItem[];
+  raw_explanation: RawExplanationItem[];
+}
 
 interface DashboardData {
   stats: {
@@ -27,7 +54,6 @@ export default function Home() {
 
   // 1. Load Restaurant List on Start
   useEffect(() => {
-    // 🆕 UPDATED: Uses your live API_URL
     axios.get(`${API_URL}/restaurants`)
       .then(res => setRestaurants(res.data))
       .catch(err => {
@@ -43,7 +69,6 @@ export default function Home() {
     setError('');
     setData(null);
     try {
-      // 🆕 UPDATED: Uses your live API_URL
       const res = await axios.get(`${API_URL}/search?name=${encodeURIComponent(name)}`);
       setData(res.data);
     } catch (err) {
@@ -79,15 +104,20 @@ export default function Home() {
       {data && (
         <main className="max-w-5xl mx-auto animate-fade-in">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            {/* Fixed: Calculate mismatches from the review array directly to be accurate */}
             <MetricCard label="Trust Score" value={`${data.stats.trust_score}/100`} icon={<ShieldCheck className="text-blue-500" />} color="blue" />
             <MetricCard label="Genuine Reviews" value={data.stats.real} icon={<ShieldCheck className="text-green-500" />} color="green" />
             <MetricCard label="Suspicious Reviews" value={data.stats.fakes} icon={<ShieldAlert className="text-red-500" />} color="red" />
-            <MetricCard label="Rating Mismatches" value={data.stats.total - data.stats.real - data.stats.fakes || "0"} icon={<AlertTriangle className="text-orange-500" />} color="orange" />
+            <MetricCard
+              label="Rating Mismatches"
+              value={data.reviews.filter(r => r.is_mismatch).length}
+              icon={<AlertTriangle className="text-orange-500" />}
+              color="orange"
+            />
           </div>
 
           <h2 className="text-2xl font-bold text-gray-800 mb-6">📝 Review Analysis</h2>
           <div className="space-y-6">
-            {/* 🆕 PASSED API_URL PROP DOWN TO COMPONENT */}
             {data.reviews.map((review, idx) => (
               <ReviewCard key={idx} review={review} apiUrl={API_URL} />
             ))}
@@ -117,10 +147,14 @@ function MetricCard({ label, value, icon, color }: MetricCardProps) {
   );
 }
 
-
 // --- COMPONENT: AUDIT & EVIDENCE REPORT ---
-function ReviewCard({ review, apiUrl }) {
-  const [report, setReport] = useState(null);
+interface ReviewCardProps {
+  review: Review;
+  apiUrl: string;
+}
+
+function ReviewCard({ review, apiUrl }: ReviewCardProps) {
+  const [report, setReport] = useState<AuditReport | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleExplain = async () => {
@@ -136,7 +170,7 @@ function ReviewCard({ review, apiUrl }) {
 
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-      {/* HEADER (Same as before) */}
+      {/* HEADER */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-xs font-bold ${review.is_fake ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -149,7 +183,7 @@ function ReviewCard({ review, apiUrl }) {
         {review.is_mismatch && <span className="flex items-center gap-1 text-xs text-orange-600 font-medium bg-orange-50 px-2 py-1 rounded border border-orange-100"><AlertTriangle size={14} /> Mismatch Detected</span>}
       </div>
 
-      {/* DEFAULT TEXT VIEW (When report is closed) */}
+      {/* DEFAULT TEXT VIEW */}
       {!report && <p className="text-gray-700 mb-4 leading-relaxed">{review.text}</p>}
 
       {/* 👇 THE NEW "AUDIT REPORT" UI */}
@@ -171,14 +205,13 @@ function ReviewCard({ review, apiUrl }) {
             <div className="mb-6">
               <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">💡 Analysis Summary</h5>
               <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                {/* Simple bold renderer */}
                 {report.summary.split("**").map((part, i) =>
                   i % 2 === 1 ? <strong key={i} className={report.verdict_color === 'red' ? 'text-red-700' : 'text-green-700'}>{part}</strong> : part
                 )}
               </p>
             </div>
 
-            {/* C. EVIDENCE CARDS (Only show if there is evidence) */}
+            {/* C. EVIDENCE CARDS */}
             {report.evidence && report.evidence.length > 0 && (
               <div className="mb-6">
                 <h5 className="text-xs font-bold text-gray-400 uppercase mb-3">🔍 Top Suspicious Indicators</h5>
@@ -200,7 +233,6 @@ function ReviewCard({ review, apiUrl }) {
               <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">📄 Annotated Review Text</h5>
               <div className="text-gray-600 text-sm leading-7 bg-gray-50 p-4 rounded border border-gray-200 font-mono">
                 {report.raw_explanation.map((item, i) => {
-                  // Underline style instead of background color for a cleaner "Report" look
                   if (item.score > 0.05) return <span key={i} className="text-red-700 font-bold border-b-2 border-red-200" title="High Risk Term">{item.word} </span>;
                   if (item.score < -0.05) return <span key={i} className="text-green-700 font-bold border-b-2 border-green-200" title="Trust Signal">{item.word} </span>;
                   return <span key={i}>{item.word} </span>;
