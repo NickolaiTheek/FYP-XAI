@@ -5,7 +5,7 @@ import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 from transformers_interpret import SequenceClassificationExplainer
 from fastapi.middleware.cors import CORSMiddleware
-from textblob import TextBlob  # 🆕 For Sentiment/Consistency Check
+from textblob import TextBlob
 import os
 
 app = FastAPI()
@@ -33,6 +33,7 @@ try:
     model_path = "Models"
     tokenizer = DistilBertTokenizer.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
+    # ⚠️ CRITICAL: We map specific labels if needed, but usually 1=Fake, 0=Real
     explainer = SequenceClassificationExplainer(model, tokenizer)
     print("✅ AI Models loaded successfully")
 except Exception as e:
@@ -42,14 +43,14 @@ except Exception as e:
 # --- HELPER FUNCTIONS ---
 
 def clean_token(word):
-    """Removes special BERT characters like ## from words"""
+    """Removes special BERT characters"""
     return word.replace("##", "").strip()
 
 def analyze_risk_factors(explanation_list):
-    """Extracts the top 3 'Evidence Words'."""
+    """Extracts top 3 words that carry positive (Fake) signal."""
     suspicious_words = [
         (clean_token(word), score) for word, score in explanation_list 
-        if score > 0 and len(clean_token(word)) > 2 and word not in ["[CLS]", "[SEP]"]
+        if score > 0.05 and len(clean_token(word)) > 2 and word not in ["[CLS]", "[SEP]"]
     ]
     suspicious_words.sort(key=lambda x: x[1], reverse=True)
     
@@ -62,7 +63,7 @@ def analyze_risk_factors(explanation_list):
         
         impact = "Medium"
         color = "orange"
-        if score > 0.05:
+        if score > 0.15: # Higher threshold for "Red" impact
             impact = "High"
             color = "red"
             
@@ -111,75 +112,73 @@ def search_restaurant(name: str):
         "reviews": reviews_data
     }
 
-# 🆕 Updated Request Model to include stars
 class ExplainRequest(BaseModel):
     text: str
     stars: int 
 
 @app.post("/explain")
 def explain_review(request: ExplainRequest):
-    """Runs XAI, Sentiment Analysis, and generates the Professional Audit Report"""
     if not explainer:
         raise HTTPException(status_code=500, detail="Model not active")
     
-    # 1. Run Inference (XAI)
-    word_attributions = explainer(request.text)
+    # 1. GET ACTUAL MODEL PREDICTION FIRST (The "Ground Truth")
+    inputs = tokenizer(request.text, return_tensors="pt", truncation=True, max_length=512)
+    with torch.no_grad():
+        outputs = model(**inputs)
     
-    fake_signal = sum([score for _, score in word_attributions if score > 0])
-    total_signal = sum([abs(score) for _, score in word_attributions])
+    probs = torch.nn.functional.softmax(outputs.logits, dim=1)
+    fake_prob = probs[0][1].item() # Probability of Class 1 (Fake)
     
-    risk_percent = 0
-    if total_signal > 0:
-        risk_percent = int((fake_signal / total_signal) * 100)
-        
+    # 2. CALCULATE RISK SCORE
+    risk_percent = int(fake_prob * 100)
     is_high_risk = risk_percent > 50
 
-    # 2. Sentiment & Consistency Analysis (For the Bar Chart)
+    # 3. RUN EXPLAINER (Targeting the 'Fake' Class 1 explicitly)
+    # This ensures Positive Score ALWAYS means "Contributes to FAKE"
+    # Even if the review is Genuine, we want to see what words *might* look fake.
+    word_attributions = explainer(request.text, class_name="LABEL_1")
+
+    # 4. Sentiment & Consistency Logic
     try:
         blob = TextBlob(request.text)
-        sentiment_val = blob.sentiment.polarity # -1.0 to 1.0
-        # Normalize to 0-100 scale (where 50 is neutral)
+        sentiment_val = blob.sentiment.polarity
         sentiment_score = int((sentiment_val + 1) * 50)
     except:
-        sentiment_score = 50 # Default to neutral if fails
+        sentiment_score = 50 
 
-    # Normalize Stars to 0-100 scale
     rating_score = int((request.stars / 5) * 100)
-    
-    # Calculate Gap
     consistency_gap = abs(rating_score - sentiment_score)
-    is_mismatch = consistency_gap > 35 # Threshold for visual warning
+    is_mismatch = consistency_gap > 40 # Slightly relaxed threshold
 
-    # 3. Generate Trust Badges (The "Chips")
+    # 5. Generate Badges
     badges = []
+    evidence = analyze_risk_factors(word_attributions)
+
     if is_high_risk:
-        # Fake Badges
-        if len(analyze_risk_factors(word_attributions)) > 0:
+        if len(evidence) > 0:
             badges.append({"label": "Generic Keywords", "type": "yellow", "icon": "⚠️"})
         if is_mismatch:
             badges.append({"label": "High Inconsistency", "type": "red", "icon": "⛔"})
         else:
             badges.append({"label": "Deceptive Patterns", "type": "red", "icon": "🚨"})
     else:
-        # Genuine Badges
         badges.append({"label": "Consistent Rating", "type": "green", "icon": "✅"})
         if sentiment_score > 60:
-            badges.append({"label": "Positive Sentiment", "type": "blue", "icon": "✅"})
-        if risk_percent < 20:
-             badges.append({"label": "Specific Language", "type": "green", "icon": "✅"})
+            badges.append({"label": "Positive Sentiment", "type": "blue", "icon": "👍"})
+        if risk_percent < 15:
+             badges.append({"label": "Specific Details", "type": "green", "icon": "🛡️"})
 
-    # 4. Generate Professional Summary (User Request)
+    # 6. Summary Logic
     summary = ""
     if is_high_risk:
-        summary = f"Potential deception indicators found ({risk_percent}% risk). The highlighted words suggest generic or exaggerated language often seen in paid or coordinated spam, rather than specific customer experiences."
+        summary = f"This review is flagged as **High Risk** ({risk_percent}% probability). The AI detected patterns common in paid spam, specifically relying on generic keywords rather than specific details."
     else:
-        summary = f"This review appears consistent with verified authentic feedback ({100 - risk_percent}% confidence). The highlights indicate specific, detailed language often found in real customer experiences."
+        summary = f"This review is verified as **Authentic** ({100 - risk_percent}% confidence). The language contains specific, personal details that align with genuine customer feedback."
 
-    # 5. Format Raw Data (For Tooltips)
+    # 7. Clean Data for Tooltips
     clean_raw_data = []
     for word, score in word_attributions:
         if word not in ["[CLS]", "[SEP]"]:
-            # Round score for cleaner UI (e.g., 0.15)
             clean_raw_data.append({"word": clean_token(word), "score": round(score, 3)})
 
     return {
@@ -187,10 +186,10 @@ def explain_review(request: ExplainRequest):
         "verdict": "CRITICAL ISSUES FOUND" if is_high_risk else "AUTHENTICITY VERIFIED",
         "verdict_color": "red" if is_high_risk else "green",
         "summary": summary,
-        "trust_badges": badges,         # 🆕 Badges
-        "sentiment_score": sentiment_score, # 🆕 For Bar Chart
-        "rating_score": rating_score,       # 🆕 For Bar Chart
+        "trust_badges": badges,
+        "sentiment_score": sentiment_score,
+        "rating_score": rating_score,
         "consistency_gap": consistency_gap,
-        "evidence": analyze_risk_factors(word_attributions),
+        "evidence": evidence,
         "raw_explanation": clean_raw_data
     }
