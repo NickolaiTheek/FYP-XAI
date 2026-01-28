@@ -22,11 +22,21 @@ interface RawExplanationItem {
   score: number;
 }
 
+interface TrustBadge {
+  label: string;
+  type: string;
+  icon: string;
+}
+
 interface AuditReport {
   risk_score: number;
   verdict: string;
   verdict_color: string;
   summary: string;
+  trust_badges: TrustBadge[];
+  sentiment_score: number;
+  rating_score: number;
+  consistency_gap: number;
   evidence: EvidenceItem[];
   raw_explanation: RawExplanationItem[];
 }
@@ -42,17 +52,14 @@ interface DashboardData {
 }
 
 export default function Home() {
-  // State Variables
   const [restaurants, setRestaurants] = useState<string[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 🆕 DEFINE YOUR LIVE API URL HERE
   const API_URL = "https://nickolaitheek-trustxplain-backend.hf.space";
 
-  // 1. Load Restaurant List on Start
   useEffect(() => {
     axios.get(`${API_URL}/restaurants`)
       .then(res => setRestaurants(res.data))
@@ -62,7 +69,6 @@ export default function Home() {
       });
   }, []);
 
-  // 2. Handle Search
   const handleSearch = async (name: string) => {
     setSelectedRestaurant(name);
     setLoading(true);
@@ -127,16 +133,9 @@ export default function Home() {
   );
 }
 
-// --- COMPONENT: METRIC CARD ---
-interface MetricCardProps {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: 'blue' | 'green' | 'red' | 'orange';
-}
-
-function MetricCard({ label, value, icon, color }: MetricCardProps) {
-  const colors = { blue: "bg-blue-50 border-blue-100", green: "bg-green-50 border-green-100", red: "bg-red-50 border-red-100", orange: "bg-orange-50 border-orange-100" };
+// --- METRIC CARD ---
+function MetricCard({ label, value, icon, color }: any) {
+  const colors: any = { blue: "bg-blue-50 border-blue-100", green: "bg-green-50 border-green-100", red: "bg-red-50 border-red-100", orange: "bg-orange-50 border-orange-100" };
   return (
     <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm`}>
       <div className="flex justify-center mb-2">{icon}</div>
@@ -146,21 +145,16 @@ function MetricCard({ label, value, icon, color }: MetricCardProps) {
   );
 }
 
-// --- COMPONENT: AUDIT & EVIDENCE REPORT (SAFE MODE) ---
-interface ReviewCardProps {
-  review: Review;
-  apiUrl: string;
-}
-
-function ReviewCard({ review, apiUrl }: ReviewCardProps) {
-  // 🛡️ Use 'any' to safely handle potentially partial/old data from backend
-  const [report, setReport] = useState<any | null>(null);
+// --- REVIEW CARD (WITH UPDATED AUDIT UI) ---
+function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
+  const [report, setReport] = useState<AuditReport | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Pass Text AND Stars to backend
   const handleExplain = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${apiUrl}/explain`, { text: review.text });
+      const res = await axios.post(`${apiUrl}/explain`, { text: review.text, stars: review.stars });
       setReport(res.data);
     } catch (err) {
       alert("Analysis failed. Please try again.");
@@ -168,8 +162,7 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
     setLoading(false);
   };
 
-  // 🛡️ VALIDATION CHECK: Ensure we have the "new" data structure before rendering
-  const isReportValid = report && report.summary && report.verdict && report.evidence;
+  const isReportValid = report && report.summary && report.verdict;
 
   return (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -183,78 +176,98 @@ function ReviewCard({ review, apiUrl }: ReviewCardProps) {
             {[...Array(5)].map((_, i) => (<Star key={i} size={16} fill={i < review.stars ? "currentColor" : "none"} />))}
           </div>
         </div>
-        {review.is_mismatch && <span className="flex items-center gap-1 text-xs text-orange-600 font-medium bg-orange-50 px-2 py-1 rounded border border-orange-100"><AlertTriangle size={14} /> Mismatch Detected</span>}
       </div>
 
-      {/* DEFAULT TEXT VIEW */}
       {!report && <p className="text-gray-700 mb-4 leading-relaxed">{review.text}</p>}
 
-      {/* 👇 THE NEW "AUDIT REPORT" UI */}
+      {/* 👇 NEW AUDIT UI */}
       {report && isReportValid && (
         <div className="bg-white rounded-lg border border-gray-300 overflow-hidden animate-fade-in mb-4">
 
           {/* A. EXECUTIVE HEADER */}
           <div className={`p-4 border-b border-gray-200 flex justify-between items-center ${report.verdict_color === 'red' ? 'bg-red-50' : 'bg-green-50'}`}>
-            <div>
-              <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${report.verdict_color === 'red' ? 'text-red-800' : 'text-green-800'}`}>
-                🛡️ Credibility Audit: {report.verdict}
-              </h4>
-            </div>
+            <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${report.verdict_color === 'red' ? 'text-red-800' : 'text-green-800'}`}>
+              🛡️ Credibility Audit: {report.verdict}
+            </h4>
             <button onClick={() => setReport(null)} className="text-xs font-bold text-gray-500 hover:text-black">CLOSE XAI</button>
           </div>
 
           <div className="p-5">
-            {/* B. ANALYSIS SUMMARY */}
-            <div className="mb-6">
-              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">💡 Analysis Summary</h5>
-              <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                {/* Safe Split Check */}
-                {report.summary?.split("**").map((part: string, i: number) =>
-                  i % 2 === 1 ? <strong key={i} className={report.verdict_color === 'red' ? 'text-red-700' : 'text-green-700'}>{part}</strong> : part
-                )}
-              </p>
+            {/* 🆕 B. TRUST BADGES (Quick Scan) */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {report.trust_badges?.map((badge, i) => (
+                <span key={i} className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase border 
+                        ${badge.type === 'green' ? 'bg-green-100 text-green-700 border-green-200' :
+                    badge.type === 'blue' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                      badge.type === 'yellow' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                        'bg-red-100 text-red-700 border-red-200'
+                  }`}>
+                  <span>{badge.icon}</span> {badge.label}
+                </span>
+              ))}
             </div>
 
-            {/* C. EVIDENCE CARDS */}
-            {report.evidence && report.evidence.length > 0 && (
-              <div className="mb-6">
-                <h5 className="text-xs font-bold text-gray-400 uppercase mb-3">🔍 Top Suspicious Indicators</h5>
-                <div className="grid grid-cols-3 gap-3">
-                  {report.evidence.map((item: any, i: number) => (
-                    <div key={i} className="bg-gray-50 p-3 rounded border border-gray-200 text-center">
-                      <span className="block text-lg font-bold text-gray-800 mb-1">"{item.word}"</span>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${item.color === 'red' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
-                        {item.impact} Impact
-                      </span>
-                    </div>
-                  ))}
+            {/* C. ANALYSIS SUMMARY */}
+            <div className="mb-6">
+              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">💡 Analysis Summary</h5>
+              <p className="text-sm text-gray-800 leading-relaxed font-medium">{report.summary}</p>
+            </div>
+
+            {/* 🆕 D. VISUAL MISMATCH BAR */}
+            <div className="mb-8 bg-gray-50 p-4 rounded border border-gray-200">
+              <div className="flex justify-between items-end mb-2">
+                <h5 className="text-xs font-bold text-gray-400 uppercase">Consistency Check</h5>
+                {report.consistency_gap > 35 && (
+                  <span className="text-xs font-bold text-red-600 flex items-center gap-1 animate-pulse">
+                    <AlertTriangle size={12} /> Mismatch Detected
+                  </span>
+                )}
+              </div>
+
+              {/* Star Rating Bar */}
+              <div className="mb-3">
+                <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                  <span>Star Rating ({report.rating_score}%)</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-yellow-400 h-2.5 rounded-full" style={{ width: `${report.rating_score}%` }}></div>
                 </div>
               </div>
-            )}
 
-            {/* D. ANNOTATED SOURCE TEXT */}
+              {/* Text Sentiment Bar */}
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
+                  <span>Text Sentiment ({report.sentiment_score}%)</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${report.sentiment_score}%` }}></div>
+                </div>
+              </div>
+            </div>
+
+            {/* E. ANNOTATED REVIEW TEXT (INTERACTIVE) */}
             <div>
-              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">📄 Annotated Review Text</h5>
-              <div className="text-gray-600 text-sm leading-7 bg-gray-50 p-4 rounded border border-gray-200 font-mono">
-                {report.raw_explanation?.map((item: any, i: number) => {
-                  if (item.score > 0.05) return <span key={i} className="text-red-700 font-bold border-b-2 border-red-200" title="High Risk Term">{item.word} </span>;
-                  if (item.score < -0.05) return <span key={i} className="text-green-700 font-bold border-b-2 border-green-200" title="Trust Signal">{item.word} </span>;
+              <h5 className="text-xs font-bold text-gray-400 uppercase mb-2">📄 Annotated Review Text (Hover to Inspect)</h5>
+              <div className="text-gray-700 text-sm leading-7 bg-white p-4 rounded border border-gray-200 font-mono shadow-sm">
+                {report.raw_explanation?.map((item, i) => {
+                  // Fake Logic: Positive score = Red Highlight
+                  if (item.score > 0.05) return (
+                    <span key={i} className="bg-red-100 text-red-800 border-b-2 border-red-300 px-0.5 cursor-help transition-colors hover:bg-red-200" title={`Impact: +${Math.round(item.score * 100)}% towards Fake`}>
+                      {item.word}{" "}
+                    </span>
+                  );
+                  // Genuine Logic: Negative score = Green Highlight
+                  if (item.score < -0.05) return (
+                    <span key={i} className="bg-green-100 text-green-800 border-b-2 border-green-300 px-0.5 cursor-help transition-colors hover:bg-green-200" title={`Impact: +${Math.round(Math.abs(item.score) * 100)}% towards Genuine`}>
+                      {item.word}{" "}
+                    </span>
+                  );
                   return <span key={i}>{item.word} </span>;
                 })}
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* ⚠️ FALLBACK MESSAGE (Shows if backend is still updating) */}
-      {report && !isReportValid && (
-        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-4 text-sm text-yellow-800">
-          <div className="flex items-center gap-2 mb-2 font-bold">
-            <AlertTriangle size={16} /> System Update in Progress
           </div>
-          <p>The AI Brain is currently restarting to apply the new Audit logic. Please wait 1-2 minutes for the Hugging Face server to finish building.</p>
-          <button onClick={() => setReport(null)} className="mt-3 text-xs bg-yellow-100 px-3 py-1 rounded hover:bg-yellow-200 font-semibold">Okay, I'll Wait</button>
         </div>
       )}
 
