@@ -1,6 +1,6 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Info, Search, ShieldAlert, ShieldCheck, Star, XCircle } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Info, LayoutDashboard, Search, ShieldAlert, ShieldCheck, Star, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -61,6 +61,9 @@ export default function Home() {
   // CHANGE THIS TO YOUR LIVE BACKEND URL
   const API_URL = "https://nickolaitheek-trustxplain-backend.hf.space";
 
+  // Check if we are in "Landing Mode" (No data yet)
+  const isLanding = !data && !loading;
+
   useEffect(() => {
     axios.get(`${API_URL}/restaurants`)
       .then(res => setRestaurants(res.data))
@@ -85,31 +88,60 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans antialiased">
-      <header className="max-w-5xl mx-auto mb-10 text-center">
-        <h1 className="text-4xl font-extrabold text-gray-900 mb-2 tracking-tight">🛡️ TrustXplain</h1>
-        <p className="text-lg text-gray-600">AI-Powered Restaurant Credibility Inspector</p>
-      </header>
+    <div className={`min-h-screen bg-gray-50 font-sans antialiased transition-all duration-500 ease-in-out ${isLanding ? 'flex flex-col justify-center items-center' : 'p-8'}`}>
 
-      <div className="max-w-2xl mx-auto mb-12">
-        <div className="relative group">
+      {/* --- HEADER & SEARCH SECTION --- */}
+      {/* If Landing: Centered and Large. If Data: Top aligned and compact. */}
+      <div className={`w-full transition-all duration-500 ${isLanding ? 'max-w-2xl text-center -mt-20' : 'max-w-5xl mx-auto mb-10 text-center'}`}>
+
+        {/* LOGO & TITLE */}
+        <div className={`flex flex-col items-center justify-center mb-8 ${isLanding ? 'scale-110' : 'scale-100'}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <ShieldCheck size={isLanding ? 64 : 48} className="text-gray-800" strokeWidth={1.5} />
+            <h1 className={`${isLanding ? 'text-5xl' : 'text-4xl'} font-extrabold text-gray-900 tracking-tight`}>
+              TrustXplain
+            </h1>
+          </div>
+          <p className={`${isLanding ? 'text-xl' : 'text-lg'} text-gray-500 font-medium`}>
+            AI-Powered Restaurant Credibility Inspector
+          </p>
+        </div>
+
+        {/* SEARCH BAR */}
+        <div className={`relative group transition-all duration-300 ${isLanding ? 'shadow-lg' : ''}`}>
           <select
-            className="w-full p-4 pl-12 rounded-xl border border-gray-300 shadow-sm text-lg appearance-none bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-700 transition-all"
+            className="w-full p-4 pl-12 rounded-xl border border-gray-300 shadow-sm text-lg appearance-none bg-white focus:ring-2 focus:ring-gray-400 focus:border-gray-400 outline-none text-gray-700 transition-all cursor-pointer hover:border-gray-400"
             onChange={(e) => handleSearch(e.target.value)}
             defaultValue=""
           >
             <option value="" disabled>🔍 Select a Restaurant to Analyze...</option>
             {restaurants.map((r, i) => <option key={i} value={r}>{r}</option>)}
           </select>
-          <Search className="absolute left-4 top-4.5 text-gray-400 group-hover:text-blue-500 transition-colors" size={24} />
+          <Search className="absolute left-4 top-4.5 text-gray-400 group-hover:text-gray-600 transition-colors" size={24} />
         </div>
       </div>
 
-      {loading && <div className="text-center text-blue-600 font-medium animate-pulse flex justify-center items-center gap-2"><BrainCircuit className="animate-spin" /> Analyzing reviews...</div>}
-      {error && <div className="max-w-2xl mx-auto text-center text-red-600 bg-red-50 p-4 rounded-lg border border-red-200 shadow-sm">{error}</div>}
+      {/* --- LOADING STATE --- */}
+      {loading && (
+        <div className="text-center mt-12 animate-fade-in">
+          <div className="inline-flex flex-col items-center gap-4 p-8 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <BrainCircuit className="animate-spin text-blue-600" size={48} />
+            <span className="text-lg font-medium text-gray-600">Analyzing Reviews & Detecting Patterns...</span>
+          </div>
+        </div>
+      )}
 
+      {/* --- ERROR STATE --- */}
+      {error && (
+        <div className="max-w-xl mx-auto mt-8 text-center bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm animate-fade-in">
+          <AlertTriangle className="mx-auto text-red-500 mb-2" size={32} />
+          <p className="text-red-700 font-medium">{error}</p>
+        </div>
+      )}
+
+      {/* --- DASHBOARD CONTENT (Only shows when data exists) --- */}
       {data && (
-        <main className="max-w-5xl mx-auto animate-fade-in">
+        <main className="max-w-5xl mx-auto animate-fade-in w-full">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
             <MetricCard label="Trust Score" value={`${data.stats.trust_score}/100`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
             <MetricCard label="Genuine Reviews" value={data.stats.real} icon={<CheckCircle className="text-green-600" />} color="green" />
@@ -122,7 +154,10 @@ export default function Home() {
             />
           </div>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">📝 Review Analysis</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <LayoutDashboard size={24} className="text-gray-400" /> Review Analysis
+          </h2>
+
           <div className="space-y-6">
             {data.reviews.map((review, idx) => (
               <ReviewCard key={idx} review={review} apiUrl={API_URL} />
@@ -143,7 +178,7 @@ function MetricCard({ label, value, icon, color }: any) {
     orange: "bg-orange-50 border-orange-200 hover:border-orange-300"
   };
   return (
-    <div className={`p-6 rounded-2xl border transition-all duration-200 ${colors[color]} text-center shadow-sm hover:shadow-md`}>
+    <div className={`p-6 rounded-2xl border transition-all duration-200 ${colors[color]} text-center shadow-sm hover:shadow-md hover:-translate-y-1`}>
       <div className="flex justify-center mb-3 scale-110 transform">{icon}</div>
       <div className="text-3xl font-extrabold text-gray-900 mb-1">{value}</div>
       <div className="text-xs text-gray-600 uppercase tracking-wider font-bold">{label}</div>
@@ -159,7 +194,6 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
   const handleExplain = async () => {
     setLoading(true);
     try {
-      // Important: Send both text and stars
       const res = await axios.post(`${apiUrl}/explain`, { text: review.text, stars: review.stars });
       setReport(res.data);
     } catch (err) {
@@ -201,7 +235,7 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
           </div>
 
           <div className="p-5 bg-white/60 backdrop-blur-sm">
-            {/* B. TRUST BADGES (Quick Scan chips) */}
+            {/* B. TRUST BADGES */}
             <div className="flex flex-wrap gap-2 mb-6">
               {report.trust_badges?.map((badge, i) => (
                 <span key={i} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide border shadow-sm
@@ -258,7 +292,7 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
               {report.consistency_gap > 35 && <p className="text-xs text-red-600 mt-3 font-medium text-center">Significant gap detected between rating and text tone.</p>}
             </div>
 
-            {/* E. ANNOTATED REVIEW TEXT (Interactive Tooltips) */}
+            {/* E. ANNOTATED REVIEW TEXT */}
             <div>
               <h5 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><Search size={14} /> Evidence Highlights (Hover to Inspect)</h5>
               <div className="text-gray-800 text-[15px] leading-8 bg-white p-5 rounded-lg border border-gray-200 font-mono shadow-sm">
