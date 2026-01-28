@@ -1,6 +1,6 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Info, LayoutDashboard, Search, ShieldAlert, ShieldCheck, Star, XCircle } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Eye, Info, LayoutDashboard, Search, ShieldAlert, ShieldCheck, Star, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -87,43 +87,103 @@ export default function Home() {
     setLoading(false);
   };
 
-  return (
-    <div className={`min-h-screen bg-gray-50 font-sans antialiased transition-all duration-500 ease-in-out ${isLanding ? 'flex flex-col justify-center items-center' : 'p-8'}`}>
+  // --- 1. NEW HOME SCREEN (LANDING) ---
+  if (isLanding) {
+    return (
+      <div className="min-h-screen font-sans bg-[url('/hero-bg.png')] bg-cover bg-bottom bg-no-repeat flex flex-col items-center justify-center">
+        {/* HERO CONTENT */}
+        <div className="text-center max-w-5xl px-4 -mt-20 animate-fade-in-up">
 
-      {/* --- HEADER & SEARCH SECTION --- */}
-      {/* If Landing: Centered and Large. If Data: Top aligned and compact. */}
-      <div className={`w-full transition-all duration-500 ${isLanding ? 'max-w-2xl text-center -mt-20' : 'max-w-5xl mx-auto mb-10 text-center'}`}>
-
-        {/* LOGO & TITLE */}
-        <div className={`flex flex-col items-center justify-center mb-8 ${isLanding ? 'scale-110' : 'scale-100'}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <ShieldCheck size={isLanding ? 64 : 48} className="text-gray-800" strokeWidth={1.5} />
-            <h1 className={`${isLanding ? 'text-5xl' : 'text-4xl'} font-extrabold text-gray-900 tracking-tight`}>
-              TrustXplain
-            </h1>
+          {/* LOGO */}
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
+              <ShieldCheck className="text-white" size={32} strokeWidth={2} />
+            </div>
+            <h1 className="text-4xl font-bold text-blue-600 tracking-tight">TrustXplain</h1>
           </div>
-          <p className={`${isLanding ? 'text-xl' : 'text-lg'} text-gray-500 font-medium`}>
-            AI-Powered Restaurant Credibility Inspector
-          </p>
+
+          {/* HEADLINE */}
+          <h2 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-12 leading-tight drop-shadow-sm">
+            Trustworthy Restaurant Reviews<br className="hidden md:block" /> with Explainable AI
+          </h2>
+
+          {/* SEARCH BAR (Styled Container around Select) */}
+          <div className="max-w-2xl mx-auto bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 mb-16 transition-transform hover:scale-[1.01] hover:shadow-blue-900/10">
+            <Search className="text-gray-400 ml-5" size={22} />
+            <div className="flex-1 relative">
+              <select
+                className="w-full bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 appearance-none cursor-pointer placeholder-gray-400"
+                onChange={(e) => handleSearch(e.target.value)}
+                defaultValue=""
+              >
+                <option value="" disabled>Search for restaurants or dishes...</option>
+                {restaurants.map((r, i) => <option key={i} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-all shadow-md hover:shadow-lg active:scale-95">
+              Search
+            </button>
+          </div>
+
+          {/* FEATURES */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 text-center max-w-4xl mx-auto">
+            <div className="flex flex-col items-center gap-3 group">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 group-hover:-translate-y-1 transition-transform duration-300">
+                <ShieldCheck className="text-blue-600" size={36} />
+              </div>
+              <h3 className="text-gray-600 font-semibold text-lg">Trusted Reviews</h3>
+            </div>
+            <div className="flex flex-col items-center gap-3 group">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 group-hover:-translate-y-1 transition-transform duration-300">
+                {/* Blue gradient icon effect */}
+                <BrainCircuit className="text-blue-500" size={36} />
+              </div>
+              <h3 className="text-gray-600 font-semibold text-lg">Explainable Insights</h3>
+            </div>
+            <div className="flex flex-col items-center gap-3 group">
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 group-hover:-translate-y-1 transition-transform duration-300">
+                <Eye className="text-blue-800" size={36} />
+              </div>
+              <h3 className="text-gray-600 font-semibold text-lg">Transparent Ratings</h3>
+            </div>
+          </div>
         </div>
 
-        {/* SEARCH BAR */}
-        <div className={`relative group transition-all duration-300 ${isLanding ? 'shadow-lg' : ''}`}>
+        {/* Footer / Copyright (Optional, adds nice touch) */}
+        <div className="absolute bottom-6 text-gray-400 text-sm font-medium">
+          © 2026 TrustXplain AI
+        </div>
+      </div>
+    );
+  }
+
+  // --- 2. DASHBOARD VIEW (EXISTING / LOADING / ERROR) ---
+  return (
+    <div className="min-h-screen bg-gray-50 p-8 font-sans antialiased">
+      {/* DASHBOARD HEADER (Compact) */}
+      <div className="max-w-5xl mx-auto mb-10 text-center flex flex-col items-center animate-fade-in">
+        <div className="flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => setData(null)}>
+          <ShieldCheck size={32} className="text-gray-800" />
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">TrustXplain</h1>
+        </div>
+
+        {/* COMPACT SEARCH */}
+        <div className="relative group w-full max-w-lg">
           <select
-            className="w-full p-4 pl-12 rounded-xl border border-gray-300 shadow-sm text-lg appearance-none bg-white focus:ring-2 focus:ring-gray-400 focus:border-gray-400 outline-none text-gray-700 transition-all cursor-pointer hover:border-gray-400"
+            className="w-full p-3 pl-10 rounded-lg border border-gray-300 shadow-sm text-base appearance-none bg-white focus:ring-2 focus:ring-blue-500 outline-none text-gray-700 transition-all cursor-pointer"
             onChange={(e) => handleSearch(e.target.value)}
-            defaultValue=""
+            value={selectedRestaurant || ""}
           >
-            <option value="" disabled>🔍 Select a Restaurant to Analyze...</option>
+            <option value="" disabled>Search another restaurant...</option>
             {restaurants.map((r, i) => <option key={i} value={r}>{r}</option>)}
           </select>
-          <Search className="absolute left-4 top-4.5 text-gray-400 group-hover:text-gray-600 transition-colors" size={24} />
+          <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
         </div>
       </div>
 
       {/* --- LOADING STATE --- */}
       {loading && (
-        <div className="text-center mt-12 animate-fade-in">
+        <div className="text-center mt-20 animate-fade-in">
           <div className="inline-flex flex-col items-center gap-4 p-8 bg-white rounded-2xl shadow-sm border border-gray-100">
             <BrainCircuit className="animate-spin text-blue-600" size={48} />
             <span className="text-lg font-medium text-gray-600">Analyzing Reviews & Detecting Patterns...</span>
@@ -139,7 +199,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DASHBOARD CONTENT (Only shows when data exists) --- */}
+      {/* --- DASHBOARD CONTENT --- */}
       {data && (
         <main className="max-w-5xl mx-auto animate-fade-in w-full">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
