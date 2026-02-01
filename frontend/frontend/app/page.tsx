@@ -1,6 +1,6 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Eye, Info, LayoutDashboard, Search, ShieldAlert, ShieldCheck, Star, XCircle } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Database, Info, LayoutDashboard, Search, ShieldAlert, ShieldCheck, Star, XCircle, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -52,24 +52,33 @@ interface DashboardData {
 }
 
 export default function Home() {
+  // --- STATE ---
+  const [activeTab, setActiveTab] = useState<'search' | 'live'>('search');
+
+  // Search Mode State
   const [restaurants, setRestaurants] = useState<string[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState('');
   const [data, setData] = useState<DashboardData | null>(null);
+
+  // Live Audit Mode State
+  const [liveText, setLiveText] = useState('');
+  const [liveStars, setLiveStars] = useState(5);
+  const [liveReport, setLiveReport] = useState<AuditReport | null>(null);
+
+  // Common State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   // CHANGE THIS TO YOUR LIVE BACKEND URL
   const API_URL = "https://nickolaitheek-trustxplain-backend.hf.space";
 
-  // Check if we are in "Landing Mode" (No data yet)
-  const isLanding = !data && !loading;
+  const isLanding = !data && !liveReport && !loading;
 
   useEffect(() => {
     axios.get(`${API_URL}/restaurants`)
       .then(res => setRestaurants(res.data))
       .catch(err => {
         console.error("Backend Error:", err);
-        setError("Backend is waking up... please wait 30s and refresh.");
       });
   }, []);
 
@@ -87,111 +96,137 @@ export default function Home() {
     setLoading(false);
   };
 
-  // --- 1. NEW HOME SCREEN (LANDING) ---
+  const handleLiveAudit = async () => {
+    if (!liveText) return;
+    setLoading(true);
+    setLiveReport(null);
+    setError('');
+    try {
+      const res = await axios.post(`${API_URL}/explain`, { text: liveText, stars: liveStars });
+      setLiveReport(res.data);
+    } catch (err) {
+      setError("Analysis failed. Backend might be warming up.");
+    }
+    setLoading(false);
+  }
+
+  // --- 1. LANDING SCREEN (With Tabs) ---
   if (isLanding) {
     return (
-      <div className="min-h-screen font-sans bg-[url('/hero-bg.png')] bg-cover bg-bottom bg-no-repeat flex flex-col items-center justify-center">
-        {/* HERO CONTENT */}
-        <div className="text-center max-w-5xl px-4 -mt-20 animate-fade-in-up">
+      <div className="min-h-screen font-sans bg-[url('/hero-bg.png')] bg-cover bg-bottom bg-no-repeat flex flex-col items-center justify-center p-4">
 
+        <div className="text-center max-w-5xl px-4 -mt-20 animate-fade-in-up w-full">
           {/* LOGO */}
-          <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="flex items-center justify-center gap-3 mb-6">
             <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
               <ShieldCheck className="text-white" size={32} strokeWidth={2} />
             </div>
             <h1 className="text-4xl font-bold text-blue-600 tracking-tight">TrustXplain</h1>
           </div>
 
-          {/* HEADLINE */}
-          <h2 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-12 leading-tight drop-shadow-sm">
-            Trustworthy Restaurant Reviews<br className="hidden md:block" /> with Explainable AI
+          <h2 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-8 leading-tight drop-shadow-sm">
+            AI Credibility Inspector
           </h2>
 
-          {/* SEARCH BAR (Styled Container around Select) */}
-          <div className="max-w-2xl mx-auto bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 mb-16 transition-transform hover:scale-[1.01] hover:shadow-blue-900/10">
-            <Search className="text-gray-400 ml-5" size={22} />
-            <div className="flex-1 relative">
-              <select
-                className="w-full bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 appearance-none cursor-pointer placeholder-gray-400"
-                onChange={(e) => handleSearch(e.target.value)}
-                defaultValue=""
+          {/* TABS SWITCHER */}
+          <div className="flex justify-center mb-8">
+            <div className="bg-white p-1 rounded-full shadow-md border border-gray-200 inline-flex">
+              <button
+                onClick={() => setActiveTab('search')}
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
               >
-                <option value="" disabled>Search for restaurants or dishes...</option>
-                {restaurants.map((r, i) => <option key={i} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-all shadow-md hover:shadow-lg active:scale-95">
-              Search
-            </button>
-          </div>
-
-          {/* FEATURES */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 text-center max-w-4xl mx-auto">
-            <div className="flex flex-col items-center gap-3 group">
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 group-hover:-translate-y-1 transition-transform duration-300">
-                <ShieldCheck className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-gray-600 font-semibold text-lg">Trusted Reviews</h3>
-            </div>
-            <div className="flex flex-col items-center gap-3 group">
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 group-hover:-translate-y-1 transition-transform duration-300">
-                {/* Blue gradient icon effect */}
-                <BrainCircuit className="text-blue-500" size={36} />
-              </div>
-              <h3 className="text-gray-600 font-semibold text-lg">Explainable Insights</h3>
-            </div>
-            <div className="flex flex-col items-center gap-3 group">
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-50 group-hover:-translate-y-1 transition-transform duration-300">
-                <Eye className="text-blue-800" size={36} />
-              </div>
-              <h3 className="text-gray-600 font-semibold text-lg">Transparent Ratings</h3>
+                <Database size={16} /> Database Search
+              </button>
+              <button
+                onClick={() => setActiveTab('live')}
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'live' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+              >
+                <Zap size={16} /> Live Audit
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Footer / Copyright (Optional, adds nice touch) */}
-        <div className="absolute bottom-6 text-gray-400 text-sm font-medium">
-          © 2026 TrustXplain AI
+          {/* INPUT AREA (Swaps based on Tab) */}
+          {activeTab === 'search' ? (
+            // TAB 1: DB SEARCH
+            <div className="max-w-2xl mx-auto bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 mb-12 transition-transform hover:scale-[1.01]">
+              <Search className="text-gray-400 ml-5" size={22} />
+              <div className="flex-1 relative">
+                <select
+                  className="w-full bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 appearance-none cursor-pointer placeholder-gray-400"
+                  onChange={(e) => handleSearch(e.target.value)}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Search demo database...</option>
+                  {restaurants.map((r, i) => <option key={i} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md">Search</button>
+            </div>
+          ) : (
+            // TAB 2: LIVE AUDIT INPUT
+            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-6 border border-blue-50 mb-12 text-left">
+              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Paste Any Review Text</label>
+              <textarea
+                className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none h-32 resize-none mb-4"
+                placeholder="Paste a review from Google Maps, Yelp, or Facebook here..."
+                onChange={(e) => setLiveText(e.target.value)}
+              ></textarea>
+
+              <div className="flex justify-between items-center">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Star Rating</label>
+                  <div className="flex gap-1 text-yellow-400 cursor-pointer">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star
+                        key={star}
+                        size={24}
+                        fill={star <= liveStars ? "currentColor" : "none"}
+                        onClick={() => setLiveStars(star)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={handleLiveAudit}
+                  disabled={!liveText}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Zap size={18} /> Analyze Now
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // --- 2. DASHBOARD VIEW (EXISTING / LOADING / ERROR) ---
+  // --- 2. RESULTS VIEW (DASHBOARD or SINGLE RESULT) ---
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans antialiased">
-      {/* DASHBOARD HEADER (Compact) */}
-      <div className="max-w-5xl mx-auto mb-10 text-center flex flex-col items-center animate-fade-in">
-        <div className="flex items-center gap-2 mb-4 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => setData(null)}>
-          <ShieldCheck size={32} className="text-gray-800" />
-          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">TrustXplain</h1>
+      {/* HEADER */}
+      <div className="max-w-5xl mx-auto mb-8 flex justify-between items-center animate-fade-in">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setData(null); setLiveReport(null); }}>
+          <ShieldCheck size={28} className="text-blue-600" />
+          <h1 className="text-xl font-bold text-gray-900">TrustXplain</h1>
         </div>
-
-        {/* COMPACT SEARCH */}
-        <div className="relative group w-full max-w-lg">
-          <select
-            className="w-full p-3 pl-10 rounded-lg border border-gray-300 shadow-sm text-base appearance-none bg-white focus:ring-2 focus:ring-blue-500 outline-none text-gray-700 transition-all cursor-pointer"
-            onChange={(e) => handleSearch(e.target.value)}
-            value={selectedRestaurant || ""}
-          >
-            <option value="" disabled>Search another restaurant...</option>
-            {restaurants.map((r, i) => <option key={i} value={r}>{r}</option>)}
-          </select>
-          <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
-        </div>
+        <button onClick={() => { setData(null); setLiveReport(null); }} className="text-sm font-bold text-gray-500 hover:text-blue-600">
+          Start New Analysis
+        </button>
       </div>
 
-      {/* --- LOADING STATE --- */}
+      {/* LOADING */}
       {loading && (
         <div className="text-center mt-20 animate-fade-in">
           <div className="inline-flex flex-col items-center gap-4 p-8 bg-white rounded-2xl shadow-sm border border-gray-100">
             <BrainCircuit className="animate-spin text-blue-600" size={48} />
-            <span className="text-lg font-medium text-gray-600">Analyzing Reviews & Detecting Patterns...</span>
+            <span className="text-lg font-medium text-gray-600">Running AI Inference & XAI Logic...</span>
           </div>
         </div>
       )}
 
-      {/* --- ERROR STATE --- */}
+      {/* ERROR */}
       {error && (
         <div className="max-w-xl mx-auto mt-8 text-center bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm animate-fade-in">
           <AlertTriangle className="mx-auto text-red-500 mb-2" size={32} />
@@ -199,29 +234,41 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DASHBOARD CONTENT --- */}
-      {data && (
+      {/* --- SCENARIO A: DATABASE RESULTS --- */}
+      {data && !loading && (
         <main className="max-w-5xl mx-auto animate-fade-in w-full">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
             <MetricCard label="Trust Score" value={`${data.stats.trust_score}/100`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
             <MetricCard label="Genuine Reviews" value={data.stats.real} icon={<CheckCircle className="text-green-600" />} color="green" />
             <MetricCard label="Suspicious Reviews" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
-            <MetricCard
-              label="Rating Mismatches"
-              value={data.reviews.filter(r => r.is_mismatch).length}
-              icon={<AlertTriangle className="text-orange-600" />}
-              color="orange"
-            />
+            <MetricCard label="Rating Mismatches" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
           </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <LayoutDashboard size={24} className="text-gray-400" /> Review Analysis
-          </h2>
-
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2"><LayoutDashboard size={24} className="text-gray-400" /> Database Results</h2>
           <div className="space-y-6">
             {data.reviews.map((review, idx) => (
               <ReviewCard key={idx} review={review} apiUrl={API_URL} />
             ))}
+          </div>
+        </main>
+      )}
+
+      {/* --- SCENARIO B: LIVE AUDIT RESULT --- */}
+      {liveReport && !loading && (
+        <main className="max-w-3xl mx-auto animate-fade-in w-full">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <Zap size={24} className="text-yellow-500 fill-current" /> Live Audit Report
+            </h2>
+            <p className="text-gray-500">Real-time analysis of your custom text.</p>
+          </div>
+
+          {/* Render the Report View Directly */}
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-md">
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg italic text-gray-700 border-l-4 border-blue-400">
+              "{liveText}"
+            </div>
+            {/* Reuse the Professional Audit Report Component Logic */}
+            <AuditResultView report={liveReport} onClose={() => { }} isStatic={true} />
           </div>
         </main>
       )}
@@ -246,7 +293,7 @@ function MetricCard({ label, value, icon, color }: any) {
   );
 }
 
-// --- REVIEW CARD (WITH PROFESSIONAL AUDIT UI) ---
+// --- REVIEW CARD (Wrapper for Database items) ---
 function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
   const [report, setReport] = useState<AuditReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -257,21 +304,19 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
       const res = await axios.post(`${apiUrl}/explain`, { text: review.text, stars: review.stars });
       setReport(res.data);
     } catch (err) {
-      alert("Analysis failed. Please try again.");
+      alert("Analysis failed.");
     }
     setLoading(false);
   };
 
-  const isReportValid = report && report.summary && report.verdict;
-  const isHighRisk = report?.verdict_color === 'red';
+  const isHighRisk = review.is_fake;
 
   return (
     <div className={`bg-white p-6 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 ${isHighRisk ? 'border-red-100' : 'border-gray-200'}`}>
-      {/* HEADER */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
-          <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide ${review.is_fake ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
-            {review.is_fake ? "🚨 Suspicious" : "✅ Genuine"}
+          <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide ${isHighRisk ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
+            {isHighRisk ? "🚨 Suspicious" : "✅ Genuine"}
           </span>
           <div className="flex items-center text-yellow-400">
             {[...Array(5)].map((_, i) => (<Star key={i} size={18} fill={i < review.stars ? "currentColor" : "none"} strokeWidth={1.5} />))}
@@ -281,129 +326,93 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
 
       {!report && <p className="text-gray-700 mb-4 leading-relaxed text-[15px]">{review.text}</p>}
 
-      {/* 👇 PROFESSIONAL AUDIT REPORT UI */}
-      {report && isReportValid && (
-        <div className={`rounded-lg border overflow-hidden animate-fade-in mb-4 shadow-inner ${isHighRisk ? 'border-red-200 bg-red-50/30' : 'border-green-200 bg-green-50/30'}`}>
-
-          {/* A. EXECUTIVE HEADER */}
-          <div className={`p-4 border-b flex justify-between items-center ${isHighRisk ? 'bg-red-100/80 border-red-200' : 'bg-green-100/80 border-green-200'}`}>
-            <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${isHighRisk ? 'text-red-900' : 'text-green-900'}`}>
-              {isHighRisk ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
-              Credibility Audit: {report.verdict}
-            </h4>
-            <button onClick={() => setReport(null)} className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors">CLOSE XAI</button>
-          </div>
-
-          <div className="p-5 bg-white/60 backdrop-blur-sm">
-            {/* B. TRUST BADGES */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {report.trust_badges?.map((badge, i) => (
-                <span key={i} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide border shadow-sm
-                        ${badge.type === 'green' ? 'bg-green-100 text-green-800 border-green-200' :
-                    badge.type === 'blue' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                      badge.type === 'yellow' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                        'bg-red-100 text-red-800 border-red-200'
-                  }`}>
-                  <span className="text-base">{badge.icon}</span> {badge.label}
-                </span>
-              ))}
-            </div>
-
-            {/* C. ANALYSIS SUMMARY */}
-            <div className="mb-8">
-              <h5 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><Info size={14} /> Analysis Summary</h5>
-              <p className="text-sm text-gray-800 leading-7 font-medium bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                {report.summary}
-              </p>
-            </div>
-
-            {/* D. VISUAL CONSISTENCY BAR */}
-            <div className="mb-8 bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex justify-between items-end mb-4">
-                <h5 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><BrainCircuit size={14} /> Consistency Check</h5>
-                {report.consistency_gap > 35 && (
-                  <span className="text-xs font-extrabold text-red-600 flex items-center gap-1 bg-red-100 px-2 py-1 rounded-full border border-red-200 animate-pulse">
-                    <AlertTriangle size={14} /> Mismatch Detected
-                  </span>
-                )}
-              </div>
-
-              {/* Star Rating Bar */}
-              <div className="mb-4 relative">
-                <div className="flex justify-between text-xs font-bold text-gray-700 mb-1">
-                  <span>Star Rating Value</span>
-                  <span>{report.rating_score}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner overflow-hidden">
-                  <div className="bg-gradient-to-r from-yellow-300 to-yellow-500 h-3 rounded-full transition-all duration-1000 ease-out" style={{ width: `${report.rating_score}%` }}></div>
-                </div>
-              </div>
-
-              {/* Text Sentiment Bar */}
-              <div className="relative">
-                <div className="flex justify-between text-xs font-bold text-gray-700 mb-1">
-                  <span>Text Sentiment Score</span>
-                  <span>{report.sentiment_score}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner overflow-hidden">
-                  <div className={`h-3 rounded-full transition-all duration-1000 ease-out ${report.sentiment_score < 40 ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-blue-400 to-blue-600'}`} style={{ width: `${report.sentiment_score}%` }}></div>
-                </div>
-              </div>
-              {report.consistency_gap > 35 && <p className="text-xs text-red-600 mt-3 font-medium text-center">Significant gap detected between rating and text tone.</p>}
-            </div>
-
-            {/* E. ANNOTATED REVIEW TEXT */}
-            <div>
-              <h5 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><Search size={14} /> Evidence Highlights (Hover to Inspect)</h5>
-              <div className="text-gray-800 text-[15px] leading-8 bg-white p-5 rounded-lg border border-gray-200 font-mono shadow-sm">
-                {report.raw_explanation?.map((item, i) => {
-                  // Positive Score = Contributes to Fake (Red)
-                  if (item.score > 0.05) {
-                    const impact = Math.round(item.score * 100);
-                    return (
-                      <HighlightWithTooltip key={i} word={item.word} colorClass="bg-red-100 text-red-900 border-b-2 border-red-400 hover:bg-red-200" tooltipText={`Impact: +${impact}% towards FAKE`} />
-                    );
-                  }
-                  // Negative Score = Contributes to Genuine (Green)
-                  if (item.score < -0.05) {
-                    const impact = Math.round(Math.abs(item.score) * 100);
-                    return (
-                      <HighlightWithTooltip key={i} word={item.word} colorClass="bg-green-100 text-green-900 border-b-2 border-green-400 hover:bg-green-200" tooltipText={`Impact: +${impact}% towards AUTHENTIC`} />
-                    );
-                  }
-                  return <span key={i}>{item.word} </span>;
-                })}
-              </div>
-            </div>
-
-          </div>
-        </div>
+      {report && (
+        <AuditResultView report={report} onClose={() => setReport(null)} isStatic={false} />
       )}
 
-      {/* BUTTON */}
       {!report && (
-        <button onClick={handleExplain} disabled={loading} className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? <><BrainCircuit size={18} className="animate-spin" /> Running Comprehensive Audit...</> : <><BrainCircuit size={18} /> Run Credibility Analysis</>}
+        <button onClick={handleExplain} disabled={loading} className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
+          {loading ? <BrainCircuit size={16} className="animate-spin" /> : <BrainCircuit size={16} />}
+          Run Deep Audit
         </button>
       )}
     </div>
   );
 }
 
-// --- HELPER: CUSTOM CSS TOOLTIP COMPONENT ---
+// --- REUSABLE AUDIT RESULT VIEW ---
+function AuditResultView({ report, onClose, isStatic }: { report: AuditReport, onClose: () => void, isStatic: boolean }) {
+  const isHighRisk = report.verdict_color === 'red';
+
+  return (
+    <div className={`rounded-lg border overflow-hidden animate-fade-in mb-4 shadow-inner ${isHighRisk ? 'border-red-200 bg-red-50/30' : 'border-green-200 bg-green-50/30'}`}>
+      {/* HEADER */}
+      <div className={`p-4 border-b flex justify-between items-center ${isHighRisk ? 'bg-red-100/80 border-red-200' : 'bg-green-100/80 border-green-200'}`}>
+        <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${isHighRisk ? 'text-red-900' : 'text-green-900'}`}>
+          {isHighRisk ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
+          Credibility Audit: {report.verdict}
+        </h4>
+        {!isStatic && <button onClick={onClose} className="text-xs font-bold text-gray-500 hover:text-gray-800">CLOSE</button>}
+      </div>
+
+      <div className="p-5 bg-white/60 backdrop-blur-sm">
+        {/* BADGES */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          {report.trust_badges?.map((badge, i) => (
+            <span key={i} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide border shadow-sm ${badge.type === 'green' ? 'bg-green-100 text-green-800 border-green-200' : badge.type === 'blue' ? 'bg-blue-100 text-blue-800 border-blue-200' : badge.type === 'yellow' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
+              <span className="text-base">{badge.icon}</span> {badge.label}
+            </span>
+          ))}
+        </div>
+
+        {/* SUMMARY */}
+        <div className="mb-8">
+          <h5 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><Info size={14} /> Analysis Summary</h5>
+          <p className="text-sm text-gray-800 leading-7 font-medium bg-white p-4 rounded-lg border border-gray-200 shadow-sm">{report.summary}</p>
+        </div>
+
+        {/* CONSISTENCY BAR */}
+        <div className="mb-8 bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex justify-between items-end mb-4">
+            <h5 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><BrainCircuit size={14} /> Consistency Check</h5>
+            {report.consistency_gap > 35 && <span className="text-xs font-extrabold text-red-600 flex items-center gap-1 bg-red-100 px-2 py-1 rounded-full border border-red-200 animate-pulse"><AlertTriangle size={14} /> Mismatch</span>}
+          </div>
+          {/* Bars */}
+          <div className="mb-4 relative">
+            <div className="flex justify-between text-xs font-bold text-gray-700 mb-1"><span>Star Rating Value</span><span>{report.rating_score}%</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner"><div className="bg-gradient-to-r from-yellow-300 to-yellow-500 h-3 rounded-full" style={{ width: `${report.rating_score}%` }}></div></div>
+          </div>
+          <div className="relative">
+            <div className="flex justify-between text-xs font-bold text-gray-700 mb-1"><span>Text Sentiment Score</span><span>{report.sentiment_score}%</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner"><div className={`h-3 rounded-full ${report.sentiment_score < 40 ? 'bg-gradient-to-r from-red-400 to-red-600' : 'bg-gradient-to-r from-blue-400 to-blue-600'}`} style={{ width: `${report.sentiment_score}%` }}></div></div>
+          </div>
+        </div>
+
+        {/* EVIDENCE HIGHLIGHTS */}
+        <div>
+          <h5 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><Search size={14} /> Evidence Highlights (Hover)</h5>
+          <div className="text-gray-800 text-[15px] leading-8 bg-white p-5 rounded-lg border border-gray-200 font-mono shadow-sm">
+            {report.raw_explanation?.map((item, i) => {
+              if (item.score > 0.05) return <HighlightWithTooltip key={i} word={item.word} colorClass="bg-red-100 text-red-900 border-b-2 border-red-400 hover:bg-red-200" tooltipText={`+${Math.round(item.score * 100)}% to FAKE`} />;
+              if (item.score < -0.05) return <HighlightWithTooltip key={i} word={item.word} colorClass="bg-green-100 text-green-900 border-b-2 border-green-400 hover:bg-green-200" tooltipText={`+${Math.round(Math.abs(item.score) * 100)}% to GENUINE`} />;
+              return <span key={i}>{item.word} </span>;
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- HELPER ---
 function HighlightWithTooltip({ word, colorClass, tooltipText }: { word: string, colorClass: string, tooltipText: string }) {
   return (
     <span className="group relative inline-block cursor-help">
-      <span className={`px-1 rounded-sm transition-colors ${colorClass}`}>
-        {word}
-      </span>
-      {/* CSS Tooltip */}
+      <span className={`px-1 rounded-sm transition-colors ${colorClass}`}>{word}</span>
       <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-2 bg-gray-900 text-white text-xs font-bold rounded-md opacity-0 transform scale-95 transition-all duration-200 group-hover:opacity-100 group-hover:scale-100 shadow-lg z-50 whitespace-nowrap">
-        {tooltipText}
-        {/* Tiny arrow pointing down */}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></span>
+        {tooltipText}<span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></span>
       </span>
-      <span> </span>{/* Space after word */}
+      <span> </span>
     </span>
   );
 }
