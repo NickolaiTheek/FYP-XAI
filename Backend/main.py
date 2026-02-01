@@ -132,7 +132,7 @@ def explain_review(request: ExplainRequest):
     
     # 2. CALCULATE RISK SCORE
     risk_percent = int(fake_prob * 100)
-    is_high_risk = risk_percent > 50
+    is_high_risk = risk_percent > 65  # Increased threshold for "High Risk" label
 
     # 3. LIVE XAI: Run LIME/SHAP via the explainer
     word_attributions = explainer(request.text, class_name="LABEL_1")
@@ -153,26 +153,64 @@ def explain_review(request: ExplainRequest):
     badges = []
     evidence = analyze_risk_factors(word_attributions)
 
-    if is_high_risk:
+    if risk_percent > 65: # High Risk
         if len(evidence) > 0:
             badges.append({"label": "Generic Keywords", "type": "yellow", "icon": "⚠️"})
         if is_mismatch:
             badges.append({"label": "High Inconsistency", "type": "red", "icon": "⛔"})
         else:
             badges.append({"label": "Deceptive Patterns", "type": "red", "icon": "🚨"})
-    else:
+    elif risk_percent > 45: # Ambiguous / Grey Area
+        badges.append({"label": "Mixed Signals", "type": "yellow", "icon": "🤔"})
+        if is_mismatch:
+            badges.append({"label": "Tone Mismatch", "type": "red", "icon": "📉"})
+    else: # Genuine
         badges.append({"label": "Consistent Rating", "type": "green", "icon": "✅"})
         if sentiment_score > 60:
             badges.append({"label": "Positive Sentiment", "type": "blue", "icon": "👍"})
         if risk_percent < 15:
              badges.append({"label": "Specific Details", "type": "green", "icon": "🛡️"})
 
-    # 6. Summary Logic
+    # 6. IMPROVED SUMMARY LOGIC (Human-Centric UX)
+    # Get top 3 suspicious words for the dynamic sentence
+    suspicious_word_list = [item['word'] for item in evidence[:3]]
+    suspicious_str = ", ".join(f"'{w}'" for w in suspicious_word_list)
+
     summary = ""
-    if is_high_risk:
-        summary = f"This review is flagged as **High Risk** ({risk_percent}% probability). The AI detected patterns common in paid spam, specifically relying on generic keywords rather than specific details."
+    verdict = ""
+    verdict_color = ""
+
+    # LOGIC:
+    # 0% - 45%  : GENUINE (Green)
+    # 45% - 65% : AMBIGUOUS / MIXED SIGNALS (Orange) -> The "Safe" Zone
+    # 65% - 100%: SUSPICIOUS (Red)
+
+    if risk_percent > 65:
+        # High Confidence Fake
+        verdict = "CRITICAL ISSUES FOUND"
+        verdict_color = "red"
+        if suspicious_str:
+            summary = (f"This review is flagged as **High Risk** ({risk_percent}% confidence). "
+                       f"The model detected an over-reliance on generic promotional buzzwords like **{suspicious_str}**. "
+                       "This linguistic pattern is statistically common in paid or non-authentic content.")
+        else:
+            summary = (f"This review is flagged as **High Risk** ({risk_percent}%). "
+                       "While it mimics genuine syntax, the AI detected subtle structural anomalies often found in generated or paid reviews.")
+
+    elif risk_percent > 45:
+        # The "Grey Zone" (Inconclusive)
+        verdict = "INCONCLUSIVE / MIXED SIGNALS"
+        verdict_color = "orange" 
+        summary = (f"The analysis is **Inconclusive** ({risk_percent}% risk score). "
+                   "The review contains a mix of specific details and generic phrasing. "
+                   "It may be a genuine review written in a generic style, or a sophisticated fake. Proceed with caution.")
+    
     else:
-        summary = f"This review is verified as **Authentic** ({100 - risk_percent}% confidence). The language contains specific, personal details that align with genuine customer feedback."
+        # Genuine
+        verdict = "AUTHENTICITY VERIFIED"
+        verdict_color = "green"
+        summary = (f"This review appears **Authentic** ({100 - risk_percent}% confidence). "
+                   "The language contains specific, personal details (contextual usage) that align with genuine customer feedback patterns.")
 
     # 7. Clean Data for Tooltips
     clean_raw_data = []
@@ -182,8 +220,8 @@ def explain_review(request: ExplainRequest):
 
     return {
         "risk_score": risk_percent,
-        "verdict": "CRITICAL ISSUES FOUND" if is_high_risk else "AUTHENTICITY VERIFIED",
-        "verdict_color": "red" if is_high_risk else "green",
+        "verdict": verdict,
+        "verdict_color": verdict_color,
         "summary": summary,
         "trust_badges": badges,
         "sentiment_score": sentiment_score,
