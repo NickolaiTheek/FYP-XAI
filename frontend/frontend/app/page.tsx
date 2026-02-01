@@ -131,11 +131,12 @@ export default function Home() {
           {/* TABS SWITCHER */}
           <div className="flex justify-center mb-8">
             <div className="bg-white p-1 rounded-full shadow-md border border-gray-200 inline-flex">
+              {/* RENAMED TAB HERE */}
               <button
                 onClick={() => setActiveTab('search')}
                 className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
               >
-                <Database size={16} /> Database Search
+                <Database size={16} /> Restaurant Domain
               </button>
               <button
                 onClick={() => setActiveTab('live')}
@@ -340,16 +341,42 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
   );
 }
 
-// --- REUSABLE AUDIT RESULT VIEW ---
+// --- REUSABLE AUDIT RESULT VIEW (WITH YELLOW LIGHT FIX) ---
 function AuditResultView({ report, onClose, isStatic }: { report: AuditReport, onClose: () => void, isStatic: boolean }) {
-  const isHighRisk = report.verdict_color === 'red';
+
+  // 🔥 FIX: Mapping colors based on backend verdict_color (red, orange, green)
+  const theme = {
+    red: {
+      border: "border-red-200",
+      bg: "bg-red-50/30",
+      headerBg: "bg-red-100/80",
+      headerText: "text-red-900",
+      icon: <ShieldAlert size={18} />
+    },
+    orange: {
+      border: "border-yellow-200",
+      bg: "bg-yellow-50/30",
+      headerBg: "bg-yellow-100/80",
+      headerText: "text-yellow-900",
+      icon: <AlertTriangle size={18} />
+    },
+    green: {
+      border: "border-green-200",
+      bg: "bg-green-50/30",
+      headerBg: "bg-green-100/80",
+      headerText: "text-green-900",
+      icon: <ShieldCheck size={18} />
+    }
+  }[report.verdict_color] || { // Fallback
+    border: "border-gray-200", bg: "bg-gray-50", headerBg: "bg-gray-100", headerText: "text-gray-900", icon: <Info size={18} />
+  };
 
   return (
-    <div className={`rounded-lg border overflow-hidden animate-fade-in mb-4 shadow-inner ${isHighRisk ? 'border-red-200 bg-red-50/30' : 'border-green-200 bg-green-50/30'}`}>
+    <div className={`rounded-lg border overflow-hidden animate-fade-in mb-4 shadow-inner ${theme.border} ${theme.bg}`}>
       {/* HEADER */}
-      <div className={`p-4 border-b flex justify-between items-center ${isHighRisk ? 'bg-red-100/80 border-red-200' : 'bg-green-100/80 border-green-200'}`}>
-        <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${isHighRisk ? 'text-red-900' : 'text-green-900'}`}>
-          {isHighRisk ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
+      <div className={`p-4 border-b flex justify-between items-center ${theme.headerBg} ${theme.border}`}>
+        <h4 className={`font-black text-sm uppercase tracking-wider flex items-center gap-2 ${theme.headerText}`}>
+          {theme.icon}
           Credibility Audit: {report.verdict}
         </h4>
         {!isStatic && <button onClick={onClose} className="text-xs font-bold text-gray-500 hover:text-gray-800">CLOSE</button>}
