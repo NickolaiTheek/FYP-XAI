@@ -23,21 +23,21 @@ app.add_middleware(
 try:
     df = pd.read_csv("final_app_database.csv")
     df['text'] = df['text'].astype(str)
-    print("✅ Database loaded successfully")
+    print(" Database loaded successfully")
 except Exception as e:
-    print(f"❌ Database Error: {e}")
+    print(f" Database Error: {e}")
     df = pd.DataFrame()
 
 # --- 2. LOAD AI MODEL ---
 try:
-    model_path = "Models"
+    model_path = "Models" # Ensure this folder exists and has model files
     tokenizer = DistilBertTokenizer.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
-    # ⚠️ CRITICAL: We map specific labels if needed, but usually 1=Fake, 0=Real
+    # Using the explainer for XAI
     explainer = SequenceClassificationExplainer(model, tokenizer)
-    print("✅ AI Models loaded successfully")
+    print(" AI Models loaded successfully")
 except Exception as e:
-    print(f"❌ Model Error: {e}")
+    print(f" Model Error: {e}")
     explainer = None
 
 # --- HELPER FUNCTIONS ---
@@ -116,12 +116,13 @@ class ExplainRequest(BaseModel):
     text: str
     stars: int 
 
+# This Endpoint handles BOTH Database reviews AND Live Custom reviews
 @app.post("/explain")
 def explain_review(request: ExplainRequest):
     if not explainer:
         raise HTTPException(status_code=500, detail="Model not active")
     
-    # 1. GET ACTUAL MODEL PREDICTION FIRST (The "Ground Truth")
+    # 1. LIVE INFERENCE: Run DistilBERT on the text immediately
     inputs = tokenizer(request.text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad():
         outputs = model(**inputs)
@@ -133,22 +134,20 @@ def explain_review(request: ExplainRequest):
     risk_percent = int(fake_prob * 100)
     is_high_risk = risk_percent > 50
 
-    # 3. RUN EXPLAINER (Targeting the 'Fake' Class 1 explicitly)
-    # This ensures Positive Score ALWAYS means "Contributes to FAKE"
-    # Even if the review is Genuine, we want to see what words *might* look fake.
+    # 3. LIVE XAI: Run LIME/SHAP via the explainer
     word_attributions = explainer(request.text, class_name="LABEL_1")
 
-    # 4. Sentiment & Consistency Logic
+    # 4. LIVE INCONSISTENCY CHECK: Run TextBlob immediately
     try:
         blob = TextBlob(request.text)
         sentiment_val = blob.sentiment.polarity
-        sentiment_score = int((sentiment_val + 1) * 50)
+        sentiment_score = int((sentiment_val + 1) * 50) # Convert -1..1 to 0..100
     except:
         sentiment_score = 50 
 
     rating_score = int((request.stars / 5) * 100)
     consistency_gap = abs(rating_score - sentiment_score)
-    is_mismatch = consistency_gap > 40 # Slightly relaxed threshold
+    is_mismatch = consistency_gap > 40 
 
     # 5. Generate Badges
     badges = []
