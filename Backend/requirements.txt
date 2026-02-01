@@ -5,3 +5,4 @@ torch
 transformers
 transformers-interpret
 textblob
+python-multipart
