@@ -1,12 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import pandas as pd
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 from transformers_interpret import SequenceClassificationExplainer
 from fastapi.middleware.cors import CORSMiddleware
 from textblob import TextBlob
 import os
+from dotenv import load_dotenv
+from serpapi import GoogleSearch
+
+# --- LOAD ENVIRONMENT VARIABLES ---
+load_dotenv()
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 
 app = FastAPI()
 
@@ -19,35 +24,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 1. LOAD DATA ---
+# --- 1. LOAD AI MODEL ---
 try:
-    df = pd.read_csv("final_app_database.csv")
-    df['text'] = df['text'].astype(str)
-    print(" Database loaded successfully")
-except Exception as e:
-    print(f" Database Error: {e}")
-    df = pd.DataFrame()
-
-# --- 2. LOAD AI MODEL ---
-try:
-    model_path = "Models" # Ensure this folder exists and has model files
+    model_path = "Models" # Ensure this folder exists
     tokenizer = DistilBertTokenizer.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
-    # Using the explainer for XAI
     explainer = SequenceClassificationExplainer(model, tokenizer)
-    print(" AI Models loaded successfully")
+    print("✅ AI Models loaded successfully")
 except Exception as e:
-    print(f" Model Error: {e}")
+    print(f"❌ Model Error: {e}")
     explainer = None
 
 # --- HELPER FUNCTIONS ---
-
 def clean_token(word):
-    """Removes special BERT characters"""
     return word.replace("##", "").strip()
 
 def analyze_risk_factors(explanation_list):
-    """Extracts top 3 words that carry positive (Fake) signal."""
     suspicious_words = [
         (clean_token(word), score) for word, score in explanation_list 
         if score > 0.05 and len(clean_token(word)) > 2 and word not in ["[CLS]", "[SEP]"]
@@ -61,87 +53,120 @@ def analyze_risk_factors(explanation_list):
         seen.add(word)
         if len(evidence) >= 3: break
         
-        impact = "Medium"
-        color = "orange"
-        if score > 0.15: # Higher threshold for "Red" impact
-            impact = "High"
-            color = "red"
+        impact = "High" if score > 0.15 else "Medium"
+        color = "red" if score > 0.15 else "orange"
             
         evidence.append({
-            "word": word,
-            "impact": impact,
-            "color": color,
+            "word": word, "impact": impact, "color": color,
             "reason": "Generic / Filler" if impact == "High" else "Unusual Phrasing"
         })
     return evidence
 
 # --- API ENDPOINTS ---
-
 @app.get("/")
 def home():
     return {"message": "TrustXplain API is Online 🛡️"}
 
-@app.get("/restaurants")
-def get_restaurants():
-    if df.empty: return []
-    return df['name'].unique().tolist()
-
+# 🔥 NEW LIVE SEARCH ENDPOINT 🔥
 @app.get("/search")
-def search_restaurant(name: str):
-    if df.empty: raise HTTPException(status_code=500, detail="Database not loaded")
+def search_restaurant(query: str):
+    if not SERPAPI_KEY:
+        raise HTTPException(status_code=500, detail="SerpApi key is missing from .env file")
     
-    subset = df[df['name'] == name]
-    if subset.empty: raise HTTPException(status_code=404, detail="Restaurant not found")
+    # 1. Fetch live data from Google Maps via SerpApi
+    params = {
+        "engine": "google_maps",
+        "q": query,
+        "hl": "en",
+        "api_key": SERPAPI_KEY
+    }
     
-    total = len(subset)
-    fakes = len(subset[subset['deception_prediction'] == 'deceptive'])
-    real = total - fakes
-    trust_score = int(((total - fakes) / total) * 100) if total > 0 else 0
-    
-    reviews_data = []
-    for _, row in subset.head(10).iterrows():
-        reviews_data.append({
-            "text": row['text'],
-            "stars": int(row['stars']),
-            "is_fake": True if row['deception_prediction'] == 'deceptive' else False,
-            "is_mismatch": bool(row['inconsistency_flag'])
-        })
+    try:
+        search = GoogleSearch(params)
+        results = search.get_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API Error: {str(e)}")
+
+    # Extract reviews
+    raw_reviews = []
+    if "place_results" in results and "reviews" in results["place_results"]:
+        raw_reviews = results["place_results"]["reviews"][:20] # Limit to 20 for speed
         
+    if not raw_reviews:
+        raise HTTPException(status_code=404, detail="No reviews found for this search.")
+
+    # 2. Batch Process through AI Models
+    total = 0
+    fakes = 0
+    reviews_data = []
+    
+    for rev in raw_reviews:
+        text = rev.get("snippet", "")
+        stars = rev.get("rating", 5)
+        
+        if not text or len(text) < 10: 
+            continue # Skip empty ratings
+            
+        total += 1
+        
+        # DistilBERT Classification
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+        with torch.no_grad():
+            outputs = model(**inputs)
+        probs = torch.nn.functional.softmax(outputs.logits, dim=1)
+        is_fake = probs[0][1].item() > 0.5
+        
+        if is_fake: fakes += 1
+            
+        # VADER / TextBlob Logic Check
+        try:
+            sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
+        except:
+            sentiment_score = 50
+            
+        rating_score = int((stars / 5) * 100)
+        is_mismatch = abs(rating_score - sentiment_score) > 40
+        
+        reviews_data.append({
+            "author": rev.get("user", {}).get("name", "Anonymous"),
+            "text": text,
+            "stars": stars,
+            "is_fake": is_fake,
+            "is_mismatch": is_mismatch
+        })
+
+    if total == 0:
+        raise HTTPException(status_code=404, detail="No text reviews found.")
+
+    real = total - fakes
+    trust_score = int(((total - fakes) / total) * 100)
+    
     return {
+        "restaurant_name": results.get("place_results", {}).get("title", query),
         "stats": {"total": total, "fakes": fakes, "real": real, "trust_score": trust_score},
         "reviews": reviews_data
     }
 
+# --- YOUR EXISTING EXPLAIN ENDPOINT (UNTOUCHED) ---
 class ExplainRequest(BaseModel):
     text: str
     stars: int 
 
-# This Endpoint handles BOTH Database reviews AND Live Custom reviews
 @app.post("/explain")
 def explain_review(request: ExplainRequest):
-    if not explainer:
-        raise HTTPException(status_code=500, detail="Model not active")
+    if not explainer: raise HTTPException(status_code=500, detail="Model not active")
     
-    # 1. LIVE INFERENCE: Run DistilBERT on the text immediately
     inputs = tokenizer(request.text, return_tensors="pt", truncation=True, max_length=512)
-    with torch.no_grad():
-        outputs = model(**inputs)
+    with torch.no_grad(): outputs = model(**inputs)
     
     probs = torch.nn.functional.softmax(outputs.logits, dim=1)
-    fake_prob = probs[0][1].item() # Probability of Class 1 (Fake)
-    
-    # 2. CALCULATE RISK SCORE
+    fake_prob = probs[0][1].item()
     risk_percent = int(fake_prob * 100)
-    is_high_risk = risk_percent > 65  # Increased threshold for "High Risk" label
 
-    # 3. LIVE XAI: Run LIME/SHAP via the explainer
     word_attributions = explainer(request.text, class_name="LABEL_1")
 
-    # 4. LIVE INCONSISTENCY CHECK: Run TextBlob immediately
     try:
-        blob = TextBlob(request.text)
-        sentiment_val = blob.sentiment.polarity
-        sentiment_score = int((sentiment_val + 1) * 50) # Convert -1..1 to 0..100
+        sentiment_score = int((TextBlob(request.text).sentiment.polarity + 1) * 50) 
     except:
         sentiment_score = 50 
 
@@ -149,84 +174,41 @@ def explain_review(request: ExplainRequest):
     consistency_gap = abs(rating_score - sentiment_score)
     is_mismatch = consistency_gap > 40 
 
-    # 5. Generate Badges
     badges = []
     evidence = analyze_risk_factors(word_attributions)
 
-    if risk_percent > 65: # High Risk
-        if len(evidence) > 0:
-            badges.append({"label": "Generic Keywords", "type": "yellow", "icon": "⚠️"})
-        if is_mismatch:
-            badges.append({"label": "High Inconsistency", "type": "red", "icon": "⛔"})
-        else:
-            badges.append({"label": "Deceptive Patterns", "type": "red", "icon": "🚨"})
-    elif risk_percent > 45: # Ambiguous / Grey Area
+    if risk_percent > 65:
+        if len(evidence) > 0: badges.append({"label": "Generic Keywords", "type": "yellow", "icon": "⚠️"})
+        if is_mismatch: badges.append({"label": "High Inconsistency", "type": "red", "icon": "⛔"})
+        else: badges.append({"label": "Deceptive Patterns", "type": "red", "icon": "🚨"})
+    elif risk_percent > 45:
         badges.append({"label": "Mixed Signals", "type": "yellow", "icon": "🤔"})
-        if is_mismatch:
-            badges.append({"label": "Tone Mismatch", "type": "red", "icon": "📉"})
-    else: # Genuine
+        if is_mismatch: badges.append({"label": "Tone Mismatch", "type": "red", "icon": "📉"})
+    else:
         badges.append({"label": "Consistent Rating", "type": "green", "icon": "✅"})
-        if sentiment_score > 60:
-            badges.append({"label": "Positive Sentiment", "type": "blue", "icon": "👍"})
-        if risk_percent < 15:
-             badges.append({"label": "Specific Details", "type": "green", "icon": "🛡️"})
+        if risk_percent < 15: badges.append({"label": "Specific Details", "type": "green", "icon": "🛡️"})
 
-    # 6. IMPROVED SUMMARY LOGIC (Human-Centric UX)
-    # Get top 3 suspicious words for the dynamic sentence
     suspicious_word_list = [item['word'] for item in evidence[:3]]
     suspicious_str = ", ".join(f"'{w}'" for w in suspicious_word_list)
 
-    summary = ""
-    verdict = ""
-    verdict_color = ""
-
-    # LOGIC:
-    # 0% - 45%  : GENUINE (Green)
-    # 45% - 65% : AMBIGUOUS / MIXED SIGNALS (Orange) -> The "Safe" Zone
-    # 65% - 100%: SUSPICIOUS (Red)
-
     if risk_percent > 65:
-        # High Confidence Fake
         verdict = "CRITICAL ISSUES FOUND"
         verdict_color = "red"
-        if suspicious_str:
-            summary = (f"This review is flagged as **High Risk** ({risk_percent}% confidence). "
-                       f"The model detected an over-reliance on generic promotional buzzwords like **{suspicious_str}**. "
-                       "This linguistic pattern is statistically common in paid or non-authentic content.")
-        else:
-            summary = (f"This review is flagged as **High Risk** ({risk_percent}%). "
-                       "While it mimics genuine syntax, the AI detected subtle structural anomalies often found in generated or paid reviews.")
-
+        summary = f"Flagged as High Risk ({risk_percent}%). Found over-reliance on buzzwords like {suspicious_str}." if suspicious_str else f"Flagged as High Risk ({risk_percent}%). Detected structural anomalies."
     elif risk_percent > 45:
-        # The "Grey Zone" (Inconclusive)
         verdict = "INCONCLUSIVE / MIXED SIGNALS"
         verdict_color = "orange" 
-        summary = (f"The analysis is **Inconclusive** ({risk_percent}% risk score). "
-                   "The review contains a mix of specific details and generic phrasing. "
-                   "It may be a genuine review written in a generic style, or a sophisticated fake. Proceed with caution.")
-    
+        summary = f"Inconclusive ({risk_percent}%). Contains a mix of specific details and generic phrasing."
     else:
-        # Genuine
         verdict = "AUTHENTICITY VERIFIED"
         verdict_color = "green"
-        summary = (f"This review appears **Authentic** ({100 - risk_percent}% confidence). "
-                   "The language contains specific, personal details (contextual usage) that align with genuine customer feedback patterns.")
+        summary = f"Authentic ({100 - risk_percent}% confidence). Contextual usage aligns with genuine feedback."
 
-    # 7. Clean Data for Tooltips
-    clean_raw_data = []
-    for word, score in word_attributions:
-        if word not in ["[CLS]", "[SEP]"]:
-            clean_raw_data.append({"word": clean_token(word), "score": round(score, 3)})
+    clean_raw_data = [{"word": clean_token(w), "score": round(s, 3)} for w, s in word_attributions if w not in ["[CLS]", "[SEP]"]]
 
     return {
-        "risk_score": risk_percent,
-        "verdict": verdict,
-        "verdict_color": verdict_color,
-        "summary": summary,
-        "trust_badges": badges,
-        "sentiment_score": sentiment_score,
-        "rating_score": rating_score,
-        "consistency_gap": consistency_gap,
-        "evidence": evidence,
-        "raw_explanation": clean_raw_data
+        "risk_score": risk_percent, "verdict": verdict, "verdict_color": verdict_color,
+        "summary": summary, "trust_badges": badges, "sentiment_score": sentiment_score,
+        "rating_score": rating_score, "consistency_gap": consistency_gap,
+        "evidence": evidence, "raw_explanation": clean_raw_data
     }

@@ -6,3 +6,5 @@ transformers
 transformers-interpret
 textblob
 python-multipart
+google-search-results
+python-dotenv
