@@ -102,7 +102,7 @@ export default function Home() {
               <Search className="text-gray-400 ml-5" size={22} />
               <input
                 type="text"
-                placeholder="e.g., KFC Colombo, Sri Lanka..."
+                placeholder="e.g., "
                 className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
