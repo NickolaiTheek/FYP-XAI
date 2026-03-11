@@ -67,7 +67,7 @@ def analyze_risk_factors(explanation_list):
 def home():
     return {"message": "TrustXplain API is Online 🛡️"}
 
-# 🔥 NEW TWO-STEP LIVE SEARCH ENDPOINT 🔥
+# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH PAGINATION 🔥
 @app.get("/search")
 def search_restaurant(query: str):
     if not SERPAPI_KEY:
@@ -90,35 +90,57 @@ def search_restaurant(query: str):
     place_id = None
     restaurant_name = query
 
-    # Check if it returned a specific place
     if "place_results" in results_place:
         place_id = results_place["place_results"].get("place_id")
         restaurant_name = results_place["place_results"].get("title", query)
-    # Check if it returned a list of branches (e.g., "KFC Colombo")
     elif "local_results" in results_place and len(results_place["local_results"]) > 0:
-        place_id = results_place["local_results"][0].get("place_id") # Grab the first branch
+        place_id = results_place["local_results"][0].get("place_id")
         restaurant_name = results_place["local_results"][0].get("title", query)
         
     if not place_id:
         raise HTTPException(status_code=404, detail="Could not find this restaurant on Google Maps.")
 
-    # --- PHASE 2: Fetch the actual Review Texts using the Place ID ---
-    params_reviews = {
-        "engine": "google_maps_reviews",
-        "place_id": place_id,
-        "hl": "en",
-        "api_key": SERPAPI_KEY
-    }
+    # --- PHASE 2: Fetch 20 NEWEST Reviews using Pagination ---
+    raw_reviews = []
+    next_page_token = None
     
-    try:
-        search_reviews = GoogleSearch(params_reviews)
-        results_reviews = search_reviews.get_dict()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
+    # Loop twice to get 2 pages (20 reviews total)
+    for page in range(2):
+        params_reviews = {
+            "engine": "google_maps_reviews",
+            "place_id": place_id,
+            "hl": "en",
+            "sort_by": "newest", # 🔥 FORCES GOOGLE TO SHOW NEWEST REVIEWS 🔥
+            "api_key": SERPAPI_KEY
+        }
         
-    # Extract the texts (SerpApi calls the text 'snippet')
-    raw_reviews = results_reviews.get("reviews", [])[:20] 
-    
+        # Add the token if we are on page 2
+        if next_page_token:
+            params_reviews["next_page_token"] = next_page_token
+            
+        try:
+            search_reviews = GoogleSearch(params_reviews)
+            results_reviews = search_reviews.get_dict()
+            
+            # Add this page's reviews to our master list
+            fetched_reviews = results_reviews.get("reviews", [])
+            raw_reviews.extend(fetched_reviews)
+            
+            # Check if there is a next page token for the next loop iteration
+            if "serpapi_pagination" in results_reviews and "next_page_token" in results_reviews["serpapi_pagination"]:
+                next_page_token = results_reviews["serpapi_pagination"]["next_page_token"]
+            else:
+                break # Stop the loop if there are no more pages available
+                
+        except Exception as e:
+            if page == 0:
+                raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
+            else:
+                break # If page 2 fails for some reason, just proceed with page 1's data
+                
+    # Ensure we strictly have a maximum of 20 raw reviews before filtering
+    raw_reviews = raw_reviews[:20]
+
     if not raw_reviews:
         raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
@@ -131,8 +153,9 @@ def search_restaurant(query: str):
         text = rev.get("snippet", "")
         stars = rev.get("rating", 5)
         
+        # Filter out empty ratings
         if not text or len(text) < 10: 
-            continue # Skip empty or extremely short ratings
+            continue 
             
         total += 1
         
