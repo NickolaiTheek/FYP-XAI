@@ -6,6 +6,7 @@ import { useState } from 'react';
 // --- TYPE DEFINITIONS ---
 interface Review {
   author: string;
+  date?: string; // 🔥 ADDED DATE FIELD
   text: string;
   stars: number;
   is_fake: boolean;
@@ -50,7 +51,6 @@ export default function Home() {
     if (!searchQuery) return;
     setLoading(true); setError(''); setData(null);
     try {
-      // Changed to pass the custom text query to our new SerpApi backend
       const res = await axios.get(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}`);
       setData(res.data);
     } catch (err: any) {
@@ -223,7 +223,13 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
             {[...Array(5)].map((_, i) => (<Star key={i} size={18} fill={i < review.stars ? "currentColor" : "none"} />))}
           </div>
         </div>
-        <span className="text-sm font-bold text-gray-400">{review.author}</span>
+        {/* 🔥 UPDATED AUTHOR AND DATE LAYOUT 🔥 */}
+        <div className="flex flex-col items-end">
+          <span className="text-sm font-bold text-gray-600">{review.author}</span>
+          {review.date && (
+            <span className="text-xs font-medium text-gray-400 mt-0.5">{review.date}</span>
+          )}
+        </div>
       </div>
       {!report && <p className="text-gray-700 mb-4">{review.text}</p>}
       {report && <AuditResultView report={report} onClose={() => setReport(null)} isStatic={false} />}

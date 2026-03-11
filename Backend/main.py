@@ -177,8 +177,12 @@ def search_restaurant(query: str):
         rating_score = int((stars / 5) * 100)
         is_mismatch = abs(rating_score - sentiment_score) > 40
         
+        # 🔥 GRAB THE DATE FROM SERPAPI 🔥
+        review_date = rev.get("date", "Recent")
+
         reviews_data.append({
             "author": rev.get("user", {}).get("name", "Anonymous"),
+            "date": review_date, # 🔥 ADDED TO OUTPUT
             "text": text,
             "stars": stars,
             "is_fake": is_fake,
