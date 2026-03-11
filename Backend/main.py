@@ -67,14 +67,14 @@ def analyze_risk_factors(explanation_list):
 def home():
     return {"message": "TrustXplain API is Online 🛡️"}
 
-# 🔥 NEW LIVE SEARCH ENDPOINT 🔥
+# 🔥 NEW TWO-STEP LIVE SEARCH ENDPOINT 🔥
 @app.get("/search")
 def search_restaurant(query: str):
     if not SERPAPI_KEY:
         raise HTTPException(status_code=500, detail="SerpApi key is missing from .env file")
     
-    # 1. Fetch live data from Google Maps via SerpApi
-    params = {
+    # --- PHASE 1: Resolve the Restaurant Name to a Google Place ID ---
+    params_place = {
         "engine": "google_maps",
         "q": query,
         "hl": "en",
@@ -82,20 +82,47 @@ def search_restaurant(query: str):
     }
     
     try:
-        search = GoogleSearch(params)
-        results = search.get_dict()
+        search_place = GoogleSearch(params_place)
+        results_place = search_place.get_dict()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API Error: {str(e)}")
 
-    # Extract reviews
-    raw_reviews = []
-    if "place_results" in results and "reviews" in results["place_results"]:
-        raw_reviews = results["place_results"]["reviews"][:20] # Limit to 20 for speed
-        
-    if not raw_reviews:
-        raise HTTPException(status_code=404, detail="No reviews found for this search.")
+    place_id = None
+    restaurant_name = query
 
-    # 2. Batch Process through AI Models
+    # Check if it returned a specific place
+    if "place_results" in results_place:
+        place_id = results_place["place_results"].get("place_id")
+        restaurant_name = results_place["place_results"].get("title", query)
+    # Check if it returned a list of branches (e.g., "KFC Colombo")
+    elif "local_results" in results_place and len(results_place["local_results"]) > 0:
+        place_id = results_place["local_results"][0].get("place_id") # Grab the first branch
+        restaurant_name = results_place["local_results"][0].get("title", query)
+        
+    if not place_id:
+        raise HTTPException(status_code=404, detail="Could not find this restaurant on Google Maps.")
+
+    # --- PHASE 2: Fetch the actual Review Texts using the Place ID ---
+    params_reviews = {
+        "engine": "google_maps_reviews",
+        "place_id": place_id,
+        "hl": "en",
+        "api_key": SERPAPI_KEY
+    }
+    
+    try:
+        search_reviews = GoogleSearch(params_reviews)
+        results_reviews = search_reviews.get_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
+        
+    # Extract the texts (SerpApi calls the text 'snippet')
+    raw_reviews = results_reviews.get("reviews", [])[:20] 
+    
+    if not raw_reviews:
+        raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
+
+    # --- PHASE 3: Batch Process through AI Models ---
     total = 0
     fakes = 0
     reviews_data = []
@@ -105,7 +132,7 @@ def search_restaurant(query: str):
         stars = rev.get("rating", 5)
         
         if not text or len(text) < 10: 
-            continue # Skip empty ratings
+            continue # Skip empty or extremely short ratings
             
         total += 1
         
@@ -136,13 +163,13 @@ def search_restaurant(query: str):
         })
 
     if total == 0:
-        raise HTTPException(status_code=404, detail="No text reviews found.")
+        raise HTTPException(status_code=404, detail="No valid text reviews found to analyze.")
 
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
     
     return {
-        "restaurant_name": results.get("place_results", {}).get("title", query),
+        "restaurant_name": restaurant_name,
         "stats": {"total": total, "fakes": fakes, "real": real, "trust_score": trust_score},
         "reviews": reviews_data
     }
