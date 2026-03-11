@@ -145,7 +145,12 @@ def search_restaurant(query: str):
     total = 0
     fakes = 0
     reviews_data = []
-    genuine_texts = [] # Store texts for Gemini
+    genuine_texts = [] 
+    
+    # 🔥 NEW METRICS TRACKING 🔥
+    total_genuine_stars = 0
+    genuine_positive = 0
+    genuine_negative = 0
     
     for rev in raw_reviews:
         text = rev.get("snippet", "")
@@ -159,14 +164,17 @@ def search_restaurant(query: str):
         probs = torch.nn.functional.softmax(outputs.logits, dim=1)
         is_fake = probs[0][1].item() > 0.5
         
+        try: sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
+        except: sentiment_score = 50
+        
         if is_fake: 
             fakes += 1
         else:
-            # Collect verified authentic reviews for the LLM
+            # Collect verified authentic data for the LLM and the metrics
             genuine_texts.append(f"Rating: {stars}/5. Review: {text}")
-            
-        try: sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
-        except: sentiment_score = 50
+            total_genuine_stars += stars
+            if sentiment_score > 55: genuine_positive += 1
+            elif sentiment_score < 45: genuine_negative += 1
             
         rating_score = int((stars / 5) * 100)
         is_mismatch = abs(rating_score - sentiment_score) > 40
@@ -185,18 +193,20 @@ def search_restaurant(query: str):
 
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
+    verified_rating = round(total_genuine_stars / real, 1) if real > 0 else 0.0 # Calculate the TRUE star rating
     
     # --- PHASE 4: Generate Authentic AI Summary ---
     ai_summary = "Not enough genuine reviews to generate a summary."
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
+        # 🔥 UPGRADED PROMPT FOR 4-PART SUMMARY 🔥
         prompt = f"""
-        You are an AI restaurant analyst. I have provided a list of VERIFIED AUTHENTIC reviews for a restaurant. 
-        Read them and provide a brief, formatting summary using EXACTLY these 3 bullet points:
+        You are an AI restaurant analyst. Read these VERIFIED AUTHENTIC reviews and provide a structured summary using EXACTLY these 4 bullet points:
         
-        🍲 **Must Try:** (Summarize the best food/drinks mentioned)
-        ✨ **Vibe & Service:** (Summarize the atmosphere and staff)
-        ⚠️ **Heads Up:** (Summarize any negatives, high prices, or warnings)
+        🍽️ **Signature Dishes:** (List 2-3 specific foods/drinks people loved)
+        💰 **Price & Value:** (Summarize if people think it's overpriced or a good deal)
+        🛎️ **Service Quality:** (Summarize staff behavior, speed, and atmosphere)
+        ⚠️ **Red Flags:** (Summarize any negatives, hygiene issues, or warnings. If none, say 'None mentioned')
 
         Keep it concise. Do not use asterisks for bolding outside of the headers.
         
@@ -215,8 +225,11 @@ def search_restaurant(query: str):
 
     return {
         "restaurant_name": restaurant_name,
-        "stats": {"total": total, "fakes": fakes, "real": real, "trust_score": trust_score},
-        "ai_summary": ai_summary, # 🔥 PASSING SUMMARY TO FRONTEND
+        "stats": {
+            "total": total, "fakes": fakes, "real": real, "trust_score": trust_score,
+            "verified_rating": verified_rating, "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
+        },
+        "ai_summary": ai_summary, 
         "reviews": reviews_data
     }
 

@@ -25,8 +25,16 @@ interface AuditReport {
 
 interface DashboardData {
   restaurant_name: string;
-  ai_summary: string; // 🔥 NEW FIELD FOR GEMINI SUMMARY
-  stats: { trust_score: number; real: number; fakes: number; total: number; };
+  ai_summary: string;
+  stats: {
+    trust_score: number;
+    real: number;
+    fakes: number;
+    total: number;
+    verified_rating: number; // 🔥 NEW
+    genuine_positive: number; // 🔥 NEW
+    genuine_negative: number; // 🔥 NEW
+  };
   reviews: Review[];
 }
 
@@ -161,11 +169,11 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            {/* Renamed to Authenticity Index */}
+            {/* 🔥 UPDATED METRICS DASHBOARD 🔥 */}
             <MetricCard label="Authenticity Index" value={`${data.stats.trust_score}%`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
-            <MetricCard label="Verified Genuine" value={data.stats.real} icon={<CheckCircle className="text-green-600" />} color="green" />
-            <MetricCard label="Quarantined Fake" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
-            <MetricCard label="Tone Mismatches" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
+            <MetricCard label="Verified Rating" value={`⭐ ${data.stats.verified_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
+            <MetricCard label="Genuine Sentiment" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
+            <MetricCard label="Quarantined Spam" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
           </div>
 
           <h3 className="text-lg font-bold text-gray-800 mb-4">Raw Data Feed ({data.stats.total} recent reviews)</h3>
@@ -189,7 +197,13 @@ export default function Home() {
 
 // --- COMPONENTS ---
 function MetricCard({ label, value, icon, color }: any) {
-  const colors: any = { blue: "bg-blue-50 border-blue-200", green: "bg-green-50 border-green-200", red: "bg-red-50 border-red-200", orange: "bg-orange-50 border-orange-200" };
+  const colors: any = {
+    blue: "bg-blue-50 border-blue-200",
+    green: "bg-green-50 border-green-200",
+    red: "bg-red-50 border-red-200",
+    orange: "bg-orange-50 border-orange-200",
+    yellow: "bg-yellow-50 border-yellow-200"
+  };
   return (
     <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm`}>
       <div className="flex justify-center mb-3 scale-110">{icon}</div>
