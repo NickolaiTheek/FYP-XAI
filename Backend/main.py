@@ -8,10 +8,19 @@ from textblob import TextBlob
 import os
 from dotenv import load_dotenv
 from serpapi import GoogleSearch
+from google import genai
 
 # --- LOAD ENVIRONMENT VARIABLES ---
 load_dotenv()
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Initialize Gemini Client
+if GEMINI_API_KEY:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    gemini_client = None
+    print("⚠️ GEMINI_API_KEY not found. Summarization will be disabled.")
 
 app = FastAPI()
 
@@ -26,7 +35,7 @@ app.add_middleware(
 
 # --- 1. LOAD AI MODEL ---
 try:
-    model_path = "Models" # Ensure this folder exists
+    model_path = "Models" 
     tokenizer = DistilBertTokenizer.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
     explainer = SequenceClassificationExplainer(model, tokenizer)
@@ -67,7 +76,7 @@ def analyze_risk_factors(explanation_list):
 def home():
     return {"message": "TrustXplain API is Online 🛡️"}
 
-# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH PAGINATION 🔥
+# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH PAGINATION & LLM SUMMARY 🔥
 @app.get("/search")
 def search_restaurant(query: str):
     if not SERPAPI_KEY:
@@ -104,80 +113,63 @@ def search_restaurant(query: str):
     raw_reviews = []
     next_page_token = None
     
-    # Loop twice to get 2 pages (20 reviews total)
     for page in range(2):
         params_reviews = {
             "engine": "google_maps_reviews",
             "place_id": place_id,
             "hl": "en",
-            "sort_by": "newestFirst", # 🔥 CHANGED TO CORRECT SERPAPI PARAMETER 🔥
+            "sort_by": "newestFirst", 
             "api_key": SERPAPI_KEY
         }
-        
-        # Add the token if we are on page 2
         if next_page_token:
             params_reviews["next_page_token"] = next_page_token
             
         try:
             search_reviews = GoogleSearch(params_reviews)
             results_reviews = search_reviews.get_dict()
-            
-            # Add this page's reviews to our master list
             fetched_reviews = results_reviews.get("reviews", [])
             raw_reviews.extend(fetched_reviews)
             
-            # Check if there is a next page token for the next loop iteration
             if "serpapi_pagination" in results_reviews and "next_page_token" in results_reviews["serpapi_pagination"]:
                 next_page_token = results_reviews["serpapi_pagination"]["next_page_token"]
             else:
-                break # Stop the loop if there are no more pages available
-                
+                break 
         except Exception as e:
-            if page == 0:
-                raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
-            else:
-                break # If page 2 fails for some reason, just proceed with page 1's data
+            if page == 0: raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
+            else: break 
                 
-    # Ensure we strictly have a maximum of 20 raw reviews before filtering
     raw_reviews = raw_reviews[:20]
-
-    if not raw_reviews:
-        raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
+    if not raw_reviews: raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
     # --- PHASE 3: Batch Process through AI Models ---
     total = 0
     fakes = 0
     reviews_data = []
+    genuine_texts = [] # Store texts for Gemini
     
     for rev in raw_reviews:
         text = rev.get("snippet", "")
         stars = rev.get("rating", 5)
         
-        # Filter out empty ratings
-        if not text or len(text) < 10: 
-            continue 
-            
+        if not text or len(text) < 10: continue 
         total += 1
         
-        # DistilBERT Classification
         inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-        with torch.no_grad():
-            outputs = model(**inputs)
+        with torch.no_grad(): outputs = model(**inputs)
         probs = torch.nn.functional.softmax(outputs.logits, dim=1)
         is_fake = probs[0][1].item() > 0.5
         
-        if is_fake: fakes += 1
+        if is_fake: 
+            fakes += 1
+        else:
+            # Collect verified authentic reviews for the LLM
+            genuine_texts.append(f"Rating: {stars}/5. Review: {text}")
             
-        # VADER / TextBlob Logic Check
-        try:
-            sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
-        except:
-            sentiment_score = 50
+        try: sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
+        except: sentiment_score = 50
             
         rating_score = int((stars / 5) * 100)
         is_mismatch = abs(rating_score - sentiment_score) > 40
-        
-        # GRAB THE DATE FROM SERPAPI
         review_date = rev.get("date", "Recent")
 
         reviews_data.append({
@@ -189,15 +181,42 @@ def search_restaurant(query: str):
             "is_mismatch": is_mismatch
         })
 
-    if total == 0:
-        raise HTTPException(status_code=404, detail="No valid text reviews found to analyze.")
+    if total == 0: raise HTTPException(status_code=404, detail="No valid text reviews found to analyze.")
 
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
     
+    # --- PHASE 4: Generate Authentic AI Summary ---
+    ai_summary = "Not enough genuine reviews to generate a summary."
+    if gemini_client and len(genuine_texts) > 0:
+        combined_text = "\n".join(genuine_texts)
+        prompt = f"""
+        You are an AI restaurant analyst. I have provided a list of VERIFIED AUTHENTIC reviews for a restaurant. 
+        Read them and provide a brief, formatting summary using EXACTLY these 3 bullet points:
+        
+        🍲 **Must Try:** (Summarize the best food/drinks mentioned)
+        ✨ **Vibe & Service:** (Summarize the atmosphere and staff)
+        ⚠️ **Heads Up:** (Summarize any negatives, high prices, or warnings)
+
+        Keep it concise. Do not use asterisks for bolding outside of the headers.
+        
+        Reviews:
+        {combined_text}
+        """
+        try:
+            response = gemini_client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+            )
+            ai_summary = response.text
+        except Exception as e:
+            print("Gemini API Error:", e)
+            ai_summary = "AI Summary temporarily unavailable."
+
     return {
         "restaurant_name": restaurant_name,
         "stats": {"total": total, "fakes": fakes, "real": real, "trust_score": trust_score},
+        "ai_summary": ai_summary, # 🔥 PASSING SUMMARY TO FRONTEND
         "reviews": reviews_data
     }
 

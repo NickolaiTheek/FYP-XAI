@@ -1,12 +1,12 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Info, Search, ShieldAlert, ShieldCheck, Star, XCircle, Zap } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, XCircle, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
 interface Review {
   author: string;
-  date?: string; // 🔥 ADDED DATE FIELD
+  date?: string;
   text: string;
   stars: number;
   is_fake: boolean;
@@ -25,18 +25,16 @@ interface AuditReport {
 
 interface DashboardData {
   restaurant_name: string;
+  ai_summary: string; // 🔥 NEW FIELD FOR GEMINI SUMMARY
   stats: { trust_score: number; real: number; fakes: number; total: number; };
   reviews: Review[];
 }
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'search' | 'live'>('search');
-
-  // Search Mode State
   const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState<DashboardData | null>(null);
 
-  // Live Audit Mode State
   const [liveText, setLiveText] = useState('');
   const [liveStars, setLiveStars] = useState(5);
   const [liveReport, setLiveReport] = useState<AuditReport | null>(null);
@@ -81,11 +79,7 @@ export default function Home() {
             </div>
             <h1 className="text-4xl font-bold text-blue-600 tracking-tight">TrustXplain</h1>
           </div>
-
-          <h2 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-8 leading-tight drop-shadow-sm">
-            AI Credibility Inspector
-          </h2>
-
+          <h2 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-8 leading-tight drop-shadow-sm">AI Credibility Inspector</h2>
           <div className="flex justify-center mb-8">
             <div className="bg-white p-1 rounded-full shadow-md border border-gray-200 inline-flex">
               <button onClick={() => setActiveTab('search')} className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
@@ -96,21 +90,11 @@ export default function Home() {
               </button>
             </div>
           </div>
-
           {activeTab === 'search' ? (
             <div className="max-w-2xl mx-auto bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 mb-12 transition-transform hover:scale-[1.01]">
               <Search className="text-gray-400 ml-5" size={22} />
-              <input
-                type="text"
-                placeholder=" "
-                className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">
-                Search
-              </button>
+              <input type="text" placeholder=" " className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+              <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">Search</button>
             </div>
           ) : (
             <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-6 border border-blue-50 mb-12 text-left">
@@ -148,7 +132,7 @@ export default function Home() {
         <div className="text-center mt-20 animate-fade-in">
           <div className="inline-flex flex-col items-center gap-4 p-8 bg-white rounded-2xl shadow-sm border border-gray-100">
             <BrainCircuit className="animate-spin text-blue-600" size={48} />
-            <span className="text-lg font-medium text-gray-600">Fetching live data & running AI...</span>
+            <span className="text-lg font-medium text-gray-600">Extracting data & analyzing authenticity...</span>
           </div>
         </div>
       )}
@@ -163,12 +147,28 @@ export default function Home() {
       {data && !loading && (
         <main className="max-w-5xl mx-auto animate-fade-in w-full">
           <h2 className="text-3xl font-extrabold text-gray-900 mb-6">{data.restaurant_name}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            <MetricCard label="Trust Score" value={`${data.stats.trust_score}/100`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
-            <MetricCard label="Genuine Reviews" value={data.stats.real} icon={<CheckCircle className="text-green-600" />} color="green" />
-            <MetricCard label="Suspicious Reviews" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
-            <MetricCard label="Rating Mismatches" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
+
+          {/* 🔥 NEW AI EXECUTIVE SUMMARY CARD 🔥 */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-6 mb-8 shadow-sm">
+             <div className="flex items-center gap-2 mb-4 text-blue-800">
+                <Sparkles size={22} className="text-blue-600" />
+                <h3 className="text-lg font-extrabold">Authentic Executive Summary</h3>
+             </div>
+             <p className="text-sm text-gray-600 mb-4 italic">Generated by Gemini AI using only the {data.stats.real} verified human reviews below. Spam has been excluded.</p>
+             <div className="bg-white rounded-xl p-5 border border-blue-100/50 shadow-sm text-gray-800 text-[15px] leading-relaxed whitespace-pre-wrap">
+                {data.ai_summary}
+             </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            {/* Renamed to Authenticity Index */}
+            <MetricCard label="Authenticity Index" value={`${data.stats.trust_score}%`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
+            <MetricCard label="Verified Genuine" value={data.stats.real} icon={<CheckCircle className="text-green-600" />} color="green" />
+            <MetricCard label="Quarantined Fake" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
+            <MetricCard label="Tone Mismatches" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
+          </div>
+          
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Raw Data Feed ({data.stats.total} recent reviews)</h3>
           <div className="space-y-6">
             {data.reviews.map((review, idx) => <ReviewCard key={idx} review={review} apiUrl={API_URL} />)}
           </div>
@@ -213,17 +213,16 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
   };
 
   return (
-    <div className={`bg-white p-6 rounded-xl border shadow-sm ${review.is_fake ? 'border-red-100' : 'border-gray-200'}`}>
+    <div className={`bg-white p-6 rounded-xl border shadow-sm ${review.is_fake ? 'border-red-100 opacity-80' : 'border-gray-200'}`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase ${review.is_fake ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-            {review.is_fake ? "🚨 Suspicious" : "✅ Genuine"}
+            {review.is_fake ? "🚨 Quarantined Spam" : "✅ Verified Genuine"}
           </span>
           <div className="flex text-yellow-400">
             {[...Array(5)].map((_, i) => (<Star key={i} size={18} fill={i < review.stars ? "currentColor" : "none"} />))}
           </div>
         </div>
-        {/* 🔥 UPDATED AUTHOR AND DATE LAYOUT 🔥 */}
         <div className="flex flex-col items-end">
           <span className="text-sm font-bold text-gray-600">{review.author}</span>
           {review.date && (
@@ -231,7 +230,7 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
           )}
         </div>
       </div>
-      {!report && <p className="text-gray-700 mb-4">{review.text}</p>}
+      {!report && <p className={`text-gray-700 mb-4 ${review.is_fake ? 'line-through text-gray-400' : ''}`}>{review.text}</p>}
       {report && <AuditResultView report={report} onClose={() => setReport(null)} isStatic={false} />}
       {!report && (
         <button onClick={handleExplain} disabled={loading} className="text-sm font-bold text-blue-600 flex items-center gap-2">
