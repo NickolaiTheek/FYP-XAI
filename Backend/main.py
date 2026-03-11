@@ -110,7 +110,7 @@ def search_restaurant(query: str):
             "engine": "google_maps_reviews",
             "place_id": place_id,
             "hl": "en",
-            "sort_by": "newest", # 🔥 FORCES GOOGLE TO SHOW NEWEST REVIEWS 🔥
+            "sort_by": "newestFirst", # 🔥 CHANGED TO CORRECT SERPAPI PARAMETER 🔥
             "api_key": SERPAPI_KEY
         }
         
@@ -177,12 +177,12 @@ def search_restaurant(query: str):
         rating_score = int((stars / 5) * 100)
         is_mismatch = abs(rating_score - sentiment_score) > 40
         
-        # 🔥 GRAB THE DATE FROM SERPAPI 🔥
+        # GRAB THE DATE FROM SERPAPI
         review_date = rev.get("date", "Recent")
 
         reviews_data.append({
             "author": rev.get("user", {}).get("name", "Anonymous"),
-            "date": review_date, # 🔥 ADDED TO OUTPUT
+            "date": review_date,
             "text": text,
             "stars": stars,
             "is_fake": is_fake,
