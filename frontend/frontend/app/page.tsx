@@ -200,10 +200,15 @@ export default function Home() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            <MetricCard label="Authenticity Index" value={`${data.stats.trust_score}%`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
+            {/* 🔥 UPDATED METRICS DASHBOARD FOR SIMPLICITY 🔥 */}
+            <MetricCard label="Review Honesty (%)" value={`${data.stats.trust_score}%`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
             <MetricCard label="Verified Rating" value={`⭐ ${data.stats.verified_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
-            <MetricCard label="Genuine Sentiment" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
-            <MetricCard label="Quarantined Spam" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
+            <MetricCard label="Verified Happy vs Unhappy Customers" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
+            <MetricCard label="Likely Fake Reviews" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
+          </div>
+
+          <div className="max-w-xl mx-auto text-center bg-gray-100 p-6 rounded-xl border border-gray-200 shadow-sm animate-fade-in mb-6">
+            <MetricCard label="Star & Comment Mismatches" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
           </div>
 
           <h3 className="text-lg font-bold text-gray-800 mb-4">Raw Data Feed ({data.stats.total} recent reviews)</h3>
@@ -274,7 +279,7 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
           )}
         </div>
       </div>
-      {!report && <p className={`text-gray-700 mb-4 ${review.is_fake ? 'line-through text-gray-400' : ''}`}>{review.text}</p>}
+      {!report && <p className="text-gray-700 mb-4">{review.text}</p>}
       {report && <AuditResultView report={report} onClose={() => setReport(null)} isStatic={false} />}
       {!report && (
         <button onClick={handleExplain} disabled={loading} className="text-sm font-bold text-blue-600 flex items-center gap-2">
