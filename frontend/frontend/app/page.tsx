@@ -266,7 +266,7 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase ${review.is_fake ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-            {review.is_fake ? "🚨 Quarantined Spam" : "✅ Verified Genuine"}
+            {review.is_fake ? "Fake Reviews or AI Generated" : "✅ Verified Genuine"}
           </span>
           <div className="flex text-yellow-400">
             {[...Array(5)].map((_, i) => (<Star key={i} size={18} fill={i < review.stars ? "currentColor" : "none"} />))}
