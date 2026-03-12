@@ -277,18 +277,24 @@ def explain_review(request: ExplainRequest):
     suspicious_word_list = [item['word'] for item in evidence[:3]]
     suspicious_str = ", ".join(f"'{w}'" for w in suspicious_word_list)
 
+    # 🔥 UPDATED NATURAL LANGUAGE SUMMARIES 🔥
     if risk_percent > 65:
         verdict = "CRITICAL ISSUES FOUND"
         verdict_color = "red"
-        summary = f"Flagged as High Risk ({risk_percent}%). Found over-reliance on buzzwords like {suspicious_str}." if suspicious_str else f"Flagged as High Risk ({risk_percent}%). Detected structural anomalies."
+        if suspicious_str:
+            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated emotional phrasing, unusual repetition, and platform-related wording patterns (such as {suspicious_str}) often found in synthetic or promotional content."
+        else:
+            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated emotional phrasing, unusual structural patterns, and repetition often found in synthetic or promotional content."
+            
     elif risk_percent > 45:
         verdict = "INCONCLUSIVE / MIXED SIGNALS"
         verdict_color = "orange" 
-        summary = f"Inconclusive ({risk_percent}%). Contains a mix of specific details and generic phrasing."
+        summary = f"This analysis is Inconclusive ({risk_percent}% Risk). The review contains a blend of genuine-sounding details and generic phrasing, making it difficult to fully verify its authenticity."
+        
     else:
         verdict = "AUTHENTICITY VERIFIED"
         verdict_color = "green"
-        summary = f"Authentic ({100 - risk_percent}% confidence). Contextual usage aligns with genuine feedback."
+        summary = f"This review appears Authentic ({100 - risk_percent}% confidence). The language, phrasing, and contextual details align closely with natural human feedback patterns."
 
     clean_raw_data = [{"word": clean_token(w), "score": round(s, 3)} for w, s in word_attributions if w not in ["[CLS]", "[SEP]"]]
 
