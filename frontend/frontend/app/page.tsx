@@ -166,7 +166,7 @@ export default function Home() {
                 <Sparkles size={20} className="text-blue-600" />
                 <h3 className="text-lg font-extrabold">Aspect-Based Scorecard</h3>
               </div>
-              <p className="text-sm text-gray-500 mb-6 italic">Extracted via AI using only verified genuine reviews.</p>
+              <p className="text-sm text-gray-500 mb-6 italic"></p>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -185,7 +185,7 @@ export default function Home() {
                         <td className="py-4 px-4 font-mono font-medium">{item.score}</td>
                         <td className="py-4 px-4">
                           <span className={`px-2 py-1 rounded text-xs font-bold ${item.confidence === 'High' ? 'bg-green-100 text-green-700' :
-                              item.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
+                            item.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
                             }`}>
                             {item.confidence}
                           </span>
