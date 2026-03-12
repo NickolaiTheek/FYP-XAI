@@ -6,6 +6,7 @@ from transformers_interpret import SequenceClassificationExplainer
 from fastapi.middleware.cors import CORSMiddleware
 from textblob import TextBlob
 import os
+import json
 from dotenv import load_dotenv
 from serpapi import GoogleSearch
 from google import genai
@@ -76,7 +77,7 @@ def analyze_risk_factors(explanation_list):
 def home():
     return {"message": "TrustXplain API is Online 🛡️"}
 
-# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH PAGINATION & LLM SUMMARY 🔥
+# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH JSON SCORECARD 🔥
 @app.get("/search")
 def search_restaurant(query: str):
     if not SERPAPI_KEY:
@@ -147,7 +148,6 @@ def search_restaurant(query: str):
     reviews_data = []
     genuine_texts = [] 
     
-    # 🔥 NEW METRICS TRACKING 🔥
     total_genuine_stars = 0
     genuine_positive = 0
     genuine_negative = 0
@@ -170,7 +170,6 @@ def search_restaurant(query: str):
         if is_fake: 
             fakes += 1
         else:
-            # Collect verified authentic data for the LLM and the metrics
             genuine_texts.append(f"Rating: {stars}/5. Review: {text}")
             total_genuine_stars += stars
             if sentiment_score > 55: genuine_positive += 1
@@ -193,22 +192,24 @@ def search_restaurant(query: str):
 
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
-    verified_rating = round(total_genuine_stars / real, 1) if real > 0 else 0.0 # Calculate the TRUE star rating
+    verified_rating = round(total_genuine_stars / real, 1) if real > 0 else 0.0 
     
-    # --- PHASE 4: Generate Authentic AI Summary ---
-    ai_summary = "Not enough genuine reviews to generate a summary."
+    # --- PHASE 4: Generate Structured Aspect Scorecard via LLM ---
+    scorecard_data = []
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
-        # 🔥 UPGRADED PROMPT FOR 4-PART SUMMARY 🔥
         prompt = f"""
-        You are an AI restaurant analyst. Read these VERIFIED AUTHENTIC reviews and provide a structured summary using EXACTLY these 4 bullet points:
+        You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
+        I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
         
-        🍽️ **Signature Dishes:** (List 2-3 specific foods/drinks people loved)
-        💰 **Price & Value:** (Summarize if people think it's overpriced or a good deal)
-        🛎️ **Service Quality:** (Summarize staff behavior, speed, and atmosphere)
-        ⚠️ **Red Flags:** (Summarize any negatives, hygiene issues, or warnings. If none, say 'None mentioned')
-
-        Keep it concise. Do not use asterisks for bolding outside of the headers.
+        Return ONLY a raw JSON array. Do not include markdown formatting, backticks, or extra text.
+        Format EXACTLY like this:
+        [
+          {{"aspect": "Food Quality", "score": "4.5/5", "confidence": "High", "evidence": "delicious, fresh seafood"}},
+          {{"aspect": "Service", "score": "3.0/5", "confidence": "Medium", "evidence": "polite but slow delivery"}}
+        ]
+        
+        If an aspect is not mentioned enough to score, set the score to "N/A", confidence to "Low", and evidence to "Not enough data".
         
         Reviews:
         {combined_text}
@@ -218,10 +219,17 @@ def search_restaurant(query: str):
                 model='gemini-2.5-flash',
                 contents=prompt,
             )
-            ai_summary = response.text
+            raw_text = response.text.strip()
+            # Clean up potential markdown blocks from Gemini
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:-3].strip()
+            elif raw_text.startswith("```"):
+                raw_text = raw_text[3:-3].strip()
+                
+            scorecard_data = json.loads(raw_text)
         except Exception as e:
-            print("Gemini API Error:", e)
-            ai_summary = "AI Summary temporarily unavailable."
+            print("Gemini API/JSON Parse Error:", e)
+            scorecard_data = []
 
     return {
         "restaurant_name": restaurant_name,
@@ -229,7 +237,7 @@ def search_restaurant(query: str):
             "total": total, "fakes": fakes, "real": real, "trust_score": trust_score,
             "verified_rating": verified_rating, "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
         },
-        "ai_summary": ai_summary, 
+        "scorecard": scorecard_data, # 🔥 PASSING JSON ARRAY TO FRONTEND
         "reviews": reviews_data
     }
 
@@ -277,7 +285,6 @@ def explain_review(request: ExplainRequest):
     suspicious_word_list = [item['word'] for item in evidence[:3]]
     suspicious_str = ", ".join(f"'{w}'" for w in suspicious_word_list)
 
-    # 🔥 UPDATED NATURAL LANGUAGE SUMMARIES 🔥
     if risk_percent > 65:
         verdict = "CRITICAL ISSUES FOUND"
         verdict_color = "red"
