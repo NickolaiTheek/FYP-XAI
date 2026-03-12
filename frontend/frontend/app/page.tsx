@@ -36,7 +36,7 @@ interface DashboardData {
   scorecard: ScorecardItem[]; // 🔥 REPLACED AI_SUMMARY WITH SCORECARD ARRAY
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    verified_rating: number; genuine_positive: number; genuine_negative: number;
+    google_rating: number; genuine_positive: number; genuine_negative: number; // 🔥 UPDATED TO GOOGLE RATING
   };
   reviews: Review[];
 }
@@ -202,7 +202,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
             {/* 🔥 UPDATED METRICS DASHBOARD FOR SIMPLICITY 🔥 */}
             <MetricCard label="Review Honesty (%)" value={`${data.stats.trust_score}%`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
-            <MetricCard label="Verified Rating" value={`⭐ ${data.stats.verified_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
+            <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
             <MetricCard label="Verified Happy vs Unhappy Customers" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
             <MetricCard label="Likely Fake Reviews" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
           </div>
