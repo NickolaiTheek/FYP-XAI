@@ -77,7 +77,7 @@ def analyze_risk_factors(explanation_list):
 def home():
     return {"message": "TrustXplain API is Online 🛡️"}
 
-# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH JSON SCORECARD 🔥
+# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH JSON SCORECARD & GOOGLE RATING 🔥
 @app.get("/search")
 def search_restaurant(query: str):
     if not SERPAPI_KEY:
@@ -99,13 +99,16 @@ def search_restaurant(query: str):
 
     place_id = None
     restaurant_name = query
+    google_rating = 0.0 # 🔥 NEW VARIABLE TO STORE OFFICIAL GOOGLE RATING
 
     if "place_results" in results_place:
         place_id = results_place["place_results"].get("place_id")
         restaurant_name = results_place["place_results"].get("title", query)
+        google_rating = results_place["place_results"].get("rating", 0.0) # 🔥 EXTRACT RATING
     elif "local_results" in results_place and len(results_place["local_results"]) > 0:
         place_id = results_place["local_results"][0].get("place_id")
         restaurant_name = results_place["local_results"][0].get("title", query)
+        google_rating = results_place["local_results"][0].get("rating", 0.0) # 🔥 EXTRACT RATING
         
     if not place_id:
         raise HTTPException(status_code=404, detail="Could not find this restaurant on Google Maps.")
@@ -148,7 +151,6 @@ def search_restaurant(query: str):
     reviews_data = []
     genuine_texts = [] 
     
-    total_genuine_stars = 0
     genuine_positive = 0
     genuine_negative = 0
     
@@ -171,7 +173,6 @@ def search_restaurant(query: str):
             fakes += 1
         else:
             genuine_texts.append(f"Rating: {stars}/5. Review: {text}")
-            total_genuine_stars += stars
             if sentiment_score > 55: genuine_positive += 1
             elif sentiment_score < 45: genuine_negative += 1
             
@@ -192,7 +193,6 @@ def search_restaurant(query: str):
 
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
-    verified_rating = round(total_genuine_stars / real, 1) if real > 0 else 0.0 
     
     # --- PHASE 4: Generate Structured Aspect Scorecard via LLM ---
     scorecard_data = []
@@ -220,7 +220,6 @@ def search_restaurant(query: str):
                 contents=prompt,
             )
             raw_text = response.text.strip()
-            # Clean up potential markdown blocks from Gemini
             if raw_text.startswith("```json"):
                 raw_text = raw_text[7:-3].strip()
             elif raw_text.startswith("```"):
@@ -235,9 +234,10 @@ def search_restaurant(query: str):
         "restaurant_name": restaurant_name,
         "stats": {
             "total": total, "fakes": fakes, "real": real, "trust_score": trust_score,
-            "verified_rating": verified_rating, "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
+            "google_rating": google_rating, # 🔥 PASSED GOOGLE RATING INSTEAD OF VERIFIED RATING
+            "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
         },
-        "scorecard": scorecard_data, # 🔥 PASSING JSON ARRAY TO FRONTEND
+        "scorecard": scorecard_data,
         "reviews": reviews_data
     }
 
