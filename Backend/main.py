@@ -38,7 +38,6 @@ app.add_middleware(
 # --- 1. LOAD V2 AI MODEL ---
 try:
     model_path = "Models" # Make sure your V2 files are in this folder!
-    # 🔥 FIX APPLIED HERE: Using Fast Tokenizer 🔥
     tokenizer = DistilBertTokenizerFast.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
     explainer = SequenceClassificationExplainer(model, tokenizer)
@@ -149,7 +148,8 @@ def search_restaurant(query: str):
     if not raw_reviews: raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
     # --- PHASE 3: Batch Process through V2 AI Model ---
-    total, fakes, genuine_positive, genuine_negative = 0, 0, 0, 0
+    # 🔥 FIX APPLIED HERE: Added genuine_neutral 🔥
+    total, fakes, genuine_positive, genuine_neutral, genuine_negative = 0, 0, 0, 0, 0
     reviews_data, genuine_texts = [], []
     
     for rev in raw_reviews:
@@ -176,8 +176,10 @@ def search_restaurant(query: str):
             fakes += 1
         else:
             genuine_texts.append(f"Rating: {stars}/5. Review: {text}")
-            if sentiment_score > 55: genuine_positive += 1
-            elif sentiment_score < 45: genuine_negative += 1
+            # 🔥 FIX APPLIED HERE: Sentiment strictly based on Stars 🔥
+            if stars >= 4: genuine_positive += 1
+            elif stars == 3: genuine_neutral += 1
+            else: genuine_negative += 1
             
         rating_score = int((stars / 5) * 100)
         is_mismatch = abs(rating_score - sentiment_score) > 40
@@ -200,6 +202,7 @@ def search_restaurant(query: str):
     scorecard_data = []
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
+        # 🔥 FIX APPLIED HERE: Short, punchy summaries in the prompt 🔥
         prompt = f"""
         You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
         I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
@@ -207,11 +210,11 @@ def search_restaurant(query: str):
         Return ONLY a raw JSON array. Do not include markdown formatting, backticks, or extra text.
         Format EXACTLY like this:
         [
-          {{"aspect": "Food Quality", "score": "4.5/5", "confidence": "High", "evidence": "delicious, fresh seafood"}},
-          {{"aspect": "Service", "score": "3.0/5", "confidence": "Medium", "evidence": "polite but slow delivery"}}
+          {{"aspect": "Food Quality", "score": "4.5/5", "confidence": "High", "evidence": "Excellent seafood, but slightly overpriced."}},
+          {{"aspect": "Service", "score": "1.0/5", "confidence": "High", "evidence": "Extremely slow and unresponsive staff."}}
         ]
         
-        If an aspect is not mentioned enough to score, set the score to "N/A", confidence to "Low", and evidence to "Not enough data".
+        CRITICAL RULE: The 'evidence' field MUST be a polished, user-friendly summary of 4 to 8 words. Do not use direct quotes from the users. Do not write paragraphs. Write it like a professional restaurant critic's summary. If an aspect is not mentioned enough to score, set the score to "N/A", confidence to "Low", and evidence to "Not enough data".
         
         Reviews:
         {combined_text}
@@ -220,7 +223,6 @@ def search_restaurant(query: str):
             response = gemini_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
             raw_text = response.text.strip()
             
-            # --- FIXING THE TRUNCATION HERE ---
             if raw_text.startswith("```json"): 
                 raw_text = raw_text[7:-3].strip()
             elif raw_text.startswith("```"): 
@@ -235,7 +237,8 @@ def search_restaurant(query: str):
         "restaurant_name": restaurant_name,
         "stats": {
             "total": total, "fakes": fakes, "real": real, "trust_score": trust_score,
-            "google_rating": google_rating, "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
+            "google_rating": google_rating, "genuine_positive": genuine_positive, 
+            "genuine_neutral": genuine_neutral, "genuine_negative": genuine_negative # 🔥 Passed Neutral stat to frontend 🔥
         },
         "scorecard": scorecard_data,
         "reviews": reviews_data
@@ -289,17 +292,22 @@ def explain_review(request: ExplainRequest):
     suspicious_str = ", ".join(f"'{w}'" for w in suspicious_word_list)
 
     if risk_percent > 65:
-        verdict = "CRITICAL ISSUES FOUND"
-        verdict_color = "red"
-        if suspicious_str:
-            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated phrasing and metadata patterns (such as {suspicious_str}) often found in synthetic or promotional content."
+        if request.stars >= 4:
+            verdict = "PROMOTIONAL / INCENTIVIZED"
+            verdict_color = "red"
+            summary = f"Flagged ({risk_percent}% Risk). While written by a human, the language contains heavily promotional and exaggerated phrasing. This often indicates the reviewer was incentivized (e.g., offered a discount or asked by staff) to leave a glowing review."
         else:
-            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses structural metadata patterns and repetition often found in synthetic or promotional content."
+            verdict = "CRITICAL ISSUES FOUND"
+            verdict_color = "red"
+            if suspicious_str:
+                summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated phrasing and metadata patterns (such as {suspicious_str}) often found in synthetic or malicious content."
+            else:
+                summary = f"This review was flagged as High Risk ({risk_percent}%). It uses structural metadata patterns and repetition often found in synthetic content."
             
     elif risk_percent > 45:
         verdict = "INCONCLUSIVE / MIXED SIGNALS"
         verdict_color = "orange" 
-        summary = f"This analysis is Inconclusive ({risk_percent}% Risk). The review contains a blend of genuine-sounding details and generic phrasing."
+        summary = f"This analysis is Inconclusive ({risk_percent}% Risk). The review contains a blend of genuine-sounding details and generic, promotional phrasing."
         
     else:
         verdict = "AUTHENTICITY VERIFIED"
