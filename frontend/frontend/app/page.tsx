@@ -35,7 +35,7 @@ interface DashboardData {
   scorecard: ScorecardItem[];
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number;
+    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number; 
   };
   reviews: Review[];
 }
@@ -203,7 +203,7 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* 🔥 RESTORED EVIDENCE FORMATTING: Retains Quotes! 🔥 */}
+                      {/* Authentic Quote Box */}
                       <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2">
                         <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic">
                           {item.evidence}
