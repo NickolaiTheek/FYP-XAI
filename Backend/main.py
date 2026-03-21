@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import torch
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from transformers import DistilBertTokenizerFast, DistilBertForSequenceClassification
 from transformers_interpret import SequenceClassificationExplainer
 from fastapi.middleware.cors import CORSMiddleware
 from textblob import TextBlob
@@ -38,7 +38,8 @@ app.add_middleware(
 # --- 1. LOAD V2 AI MODEL ---
 try:
     model_path = "Models" # Make sure your V2 files are in this folder!
-    tokenizer = DistilBertTokenizer.from_pretrained(model_path)
+    # 🔥 FIX APPLIED HERE: Using Fast Tokenizer 🔥
+    tokenizer = DistilBertTokenizerFast.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
     explainer = SequenceClassificationExplainer(model, tokenizer)
     print("✅ V2 AI Models loaded successfully")
