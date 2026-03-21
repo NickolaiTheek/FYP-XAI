@@ -170,7 +170,7 @@ export default function Home() {
             </p>
           </div>
 
-          {/* 🔥 NEW HERO SECTION: Scorecard Grid at the very top 🔥 */}
+          {/* SCORECARD GRID */}
           {data.scorecard && data.scorecard.length > 0 && (
             <div className="mb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -204,10 +204,12 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* Line-Clamp visually trims the text to 3 lines for a quick summary! */}
-                      <p className="text-xs text-gray-600 italic line-clamp-3 leading-relaxed border-l-2 border-gray-200 pl-2">
-                        "{item.evidence}"
-                      </p>
+                      {/* Cleaned up Evidence Summary Box */}
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2">
+                        <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug">
+                          {item.evidence.replace(/["']/g, '')}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}
@@ -218,7 +220,21 @@ export default function Home() {
           {/* MIDDLE SECTION: Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 border-t border-b border-gray-200 py-8">
             <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
-            <MetricCard label="Verified Happy vs Unhappy" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
+            
+            {/* 🔥 UPDATED: User-friendly Positive/Negative Metric 🔥 */}
+            <MetricCard 
+              label="Organic Sentiment" 
+              value={
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-green-600">{data.stats.genuine_positive} Pos</span>
+                  <span className="text-gray-300 text-2xl font-light">|</span>
+                  <span className="text-red-500">{data.stats.genuine_negative} Neg</span>
+                </div>
+              } 
+              icon={<CheckCircle className="text-green-600" />} 
+              color="green" 
+            />
+
             <MetricCard label="High Risk / Synthetic" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
             <MetricCard label="Mismatched Sentiment" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
           </div>
@@ -259,8 +275,8 @@ function MetricCard({ label, value, icon, color }: any) {
   return (
     <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm`}>
       <div className="flex justify-center mb-3 scale-110">{icon}</div>
-      <div className="text-3xl font-extrabold text-gray-900 mb-1">{value}</div>
-      <div className="text-xs text-gray-600 uppercase font-bold tracking-wide">{label}</div>
+      <div className="text-3xl font-extrabold text-gray-900 mb-2">{value}</div>
+      <div className="text-[11px] text-gray-500 uppercase font-black tracking-widest">{label}</div>
     </div>
   );
 }
