@@ -35,7 +35,7 @@ interface DashboardData {
   scorecard: ScorecardItem[];
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    google_rating: number; genuine_positive: number; genuine_negative: number; 
+    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number; 
   };
   reviews: Review[];
 }
@@ -227,6 +227,8 @@ export default function Home() {
               value={
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-green-600">{data.stats.genuine_positive} Pos</span>
+                  <span className="text-gray-300 text-2xl font-light">|</span>
+                  <span className="text-yellow-500">{data.stats.genuine_neutral} Neu</span>
                   <span className="text-gray-300 text-2xl font-light">|</span>
                   <span className="text-red-500">{data.stats.genuine_negative} Neg</span>
                 </div>
