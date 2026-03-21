@@ -35,7 +35,7 @@ interface DashboardData {
   scorecard: ScorecardItem[];
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number; 
+    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number;
   };
   reviews: Review[];
 }
@@ -184,10 +184,9 @@ export default function Home() {
                       <div>
                         <div className="flex justify-between items-start mb-3">
                           <h4 className="font-extrabold text-gray-800 text-sm">{item.aspect}</h4>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                            item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
-                            item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
+                              item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
+                            }`}>
                             {item.confidence}
                           </span>
                         </div>
@@ -204,10 +203,10 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* Cleaned up Evidence Summary Box */}
+                      {/* 🔥 RESTORED EVIDENCE FORMATTING: Retains Quotes! 🔥 */}
                       <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2">
-                        <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug">
-                          {item.evidence.replace(/["']/g, '')}
+                        <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic">
+                          {item.evidence}
                         </p>
                       </div>
                     </div>
@@ -220,10 +219,9 @@ export default function Home() {
           {/* MIDDLE SECTION: Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 border-t border-b border-gray-200 py-8">
             <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
-            
-            {/* 🔥 UPDATED: User-friendly Positive/Negative Metric 🔥 */}
-            <MetricCard 
-              label="Organic Sentiment" 
+
+            <MetricCard
+              label="Organic Sentiment"
               value={
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-green-600">{data.stats.genuine_positive} Pos</span>
@@ -232,9 +230,9 @@ export default function Home() {
                   <span className="text-gray-300 text-2xl font-light">|</span>
                   <span className="text-red-500">{data.stats.genuine_negative} Neg</span>
                 </div>
-              } 
-              icon={<CheckCircle className="text-green-600" />} 
-              color="green" 
+              }
+              icon={<CheckCircle className="text-green-600" />}
+              color="green"
             />
 
             <MetricCard label="High Risk / Synthetic" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />

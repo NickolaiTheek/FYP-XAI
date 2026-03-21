@@ -37,7 +37,7 @@ app.add_middleware(
 
 # --- 1. LOAD V2 AI MODEL ---
 try:
-    model_path = "Models" # Make sure your V2 files are in this folder!
+    model_path = "Models" 
     tokenizer = DistilBertTokenizerFast.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
     explainer = SequenceClassificationExplainer(model, tokenizer)
@@ -58,7 +58,6 @@ def calculate_caps_ratio(text):
     return caps / len(alpha_chars)
 
 def inject_metadata(text, stars, sentiment_score):
-    """Formats live text into the structure the V2 model was trained on."""
     word_count = len(str(text).split())
     if word_count < 15: length_tag = "SHORT"
     elif word_count > 100: length_tag = "LONG"
@@ -148,7 +147,6 @@ def search_restaurant(query: str):
     if not raw_reviews: raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
     # --- PHASE 3: Batch Process through V2 AI Model ---
-    # 🔥 FIX APPLIED HERE: Added genuine_neutral 🔥
     total, fakes, genuine_positive, genuine_neutral, genuine_negative = 0, 0, 0, 0, 0
     reviews_data, genuine_texts = [], []
     
@@ -159,14 +157,11 @@ def search_restaurant(query: str):
         if not text or len(text) < 10: continue 
         total += 1
         
-        # 1. Calculate Sentiment Base
         try: sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
         except: sentiment_score = 50
         
-        # 2. INJECT METADATA FOR V2 MODEL
         injected_text = inject_metadata(text, stars, sentiment_score)
         
-        # 3. Model Inference
         inputs = tokenizer(injected_text, return_tensors="pt", truncation=True, max_length=512)
         with torch.no_grad(): outputs = model(**inputs)
         probs = torch.nn.functional.softmax(outputs.logits, dim=1)
@@ -176,7 +171,6 @@ def search_restaurant(query: str):
             fakes += 1
         else:
             genuine_texts.append(f"Rating: {stars}/5. Review: {text}")
-            # 🔥 FIX APPLIED HERE: Sentiment strictly based on Stars 🔥
             if stars >= 4: genuine_positive += 1
             elif stars == 3: genuine_neutral += 1
             else: genuine_negative += 1
@@ -202,7 +196,7 @@ def search_restaurant(query: str):
     scorecard_data = []
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
-        # 🔥 FIX APPLIED HERE: Short, punchy summaries in the prompt 🔥
+        # 🔥 UPDATED PROMPT: Stitches short, real quotes! 🔥
         prompt = f"""
         You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
         I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
@@ -210,11 +204,12 @@ def search_restaurant(query: str):
         Return ONLY a raw JSON array. Do not include markdown formatting, backticks, or extra text.
         Format EXACTLY like this:
         [
-          {{"aspect": "Food Quality", "score": "4.5/5", "confidence": "High", "evidence": "Excellent seafood, but slightly overpriced."}},
-          {{"aspect": "Service", "score": "1.0/5", "confidence": "High", "evidence": "Extremely slow and unresponsive staff."}}
+          {{"aspect": "Food Quality", "score": "4.5/5", "confidence": "High", "evidence": "Praised for 'lovely tasty' food, though one noted 'pile of grease'."}},
+          {{"aspect": "Service", "score": "1.0/5", "confidence": "High", "evidence": "Called a 'catastrophe' with 'extremely poor waiting staff'."}}
         ]
         
-        CRITICAL RULE: The 'evidence' field MUST be a polished, user-friendly summary of 4 to 8 words. Do not use direct quotes from the users. Do not write paragraphs. Write it like a professional restaurant critic's summary. If an aspect is not mentioned enough to score, set the score to "N/A", confidence to "Low", and evidence to "Not enough data".
+        CRITICAL RULE: The 'evidence' field MUST use short, direct quotes from the reviews to capture the authentic user voice. Keep the total length under 15 words per aspect. Stitch together 1 to 3 impactful quoted phrases. Do NOT write long paragraphs. 
+        If an aspect is not mentioned enough to score, set the score to "N/A", confidence to "Low", and evidence to "Not enough data".
         
         Reviews:
         {combined_text}
@@ -238,7 +233,7 @@ def search_restaurant(query: str):
         "stats": {
             "total": total, "fakes": fakes, "real": real, "trust_score": trust_score,
             "google_rating": google_rating, "genuine_positive": genuine_positive, 
-            "genuine_neutral": genuine_neutral, "genuine_negative": genuine_negative # 🔥 Passed Neutral stat to frontend 🔥
+            "genuine_neutral": genuine_neutral, "genuine_negative": genuine_negative
         },
         "scorecard": scorecard_data,
         "reviews": reviews_data
@@ -252,14 +247,11 @@ class ExplainRequest(BaseModel):
 def explain_review(request: ExplainRequest):
     if not explainer: raise HTTPException(status_code=500, detail="Model not active")
     
-    # 1. Base Sentiment
     try: sentiment_score = int((TextBlob(request.text).sentiment.polarity + 1) * 50) 
     except: sentiment_score = 50 
 
-    # 2. INJECT METADATA FOR V2 EXPLAINER
     injected_text = inject_metadata(request.text, request.stars, sentiment_score)
 
-    # 3. Model Inference
     inputs = tokenizer(injected_text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad(): outputs = model(**inputs)
     
@@ -267,7 +259,6 @@ def explain_review(request: ExplainRequest):
     fake_prob = probs[0][1].item()
     risk_percent = int(fake_prob * 100)
 
-    # 4. Generate XAI based on injected text
     word_attributions = explainer(injected_text, class_name="LABEL_1")
 
     rating_score = int((request.stars / 5) * 100)
@@ -314,7 +305,6 @@ def explain_review(request: ExplainRequest):
         verdict_color = "green"
         summary = f"This review appears Authentic ({100 - risk_percent}% confidence). The language, phrasing, and contextual details align closely with natural human feedback patterns."
 
-    # Filter out our injected brackets and structural tokens from the frontend view
     clean_raw_data = [{"word": clean_token(w), "score": round(s, 3)} for w, s in word_attributions if w not in ["[CLS]", "[SEP]", "[", "]", ":"]]
 
     return {
