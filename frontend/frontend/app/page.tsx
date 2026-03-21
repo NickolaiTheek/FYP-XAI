@@ -35,7 +35,7 @@ interface DashboardData {
   scorecard: ScorecardItem[];
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    google_rating: number; genuine_positive: number; genuine_negative: number;
+    google_rating: number; genuine_positive: number; genuine_negative: number; 
   };
   reviews: Review[];
 }
@@ -79,7 +79,6 @@ export default function Home() {
     setLoading(false);
   }
 
-  // Helper function to color-code the new scorecard progress bars
   const getScoreColor = (score: number) => {
     if (score >= 4.0) return 'bg-green-500';
     if (score >= 2.5) return 'bg-yellow-400';
@@ -138,8 +137,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans antialiased">
-
-      <div className="max-w-[98%] mx-auto mb-8 flex justify-between items-center animate-fade-in">
+      <div className="max-w-[98%] xl:max-w-7xl mx-auto mb-8 flex justify-between items-center animate-fade-in">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setData(null); setLiveReport(null); }}>
           <ShieldCheck size={28} className="text-blue-600" />
           <h1 className="text-xl font-bold text-gray-900">TrustXplain Dashboard</h1>
@@ -164,84 +162,75 @@ export default function Home() {
       )}
 
       {data && !loading && (
-        <main className="max-w-[98%] mx-auto animate-fade-in w-full">
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-6">{data.restaurant_name}</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
-            <MetricCard label="Verified Happy vs Unhappy" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
-            <MetricCard label="High Risk / Synthetic Reviews" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
-            <MetricCard label="Star & Comment Mismatches" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
+        <main className="max-w-[98%] xl:max-w-7xl mx-auto animate-fade-in w-full">
+          <div className="mb-8">
+            <h2 className="text-4xl font-black text-gray-900">{data.restaurant_name}</h2>
+            <p className="text-gray-500 mt-2 font-medium flex items-center gap-2">
+              <Sparkles size={16} className="text-blue-500" /> AI-Generated Authenticity Report based on recent verified reviews.
+            </p>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-8">
+          {/* 🔥 NEW HERO SECTION: Scorecard Grid at the very top 🔥 */}
+          {data.scorecard && data.scorecard.length > 0 && (
+            <div className="mb-10">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {data.scorecard.map((item, idx) => {
+                  const numScore = item.score !== "N/A" ? parseFloat(item.score.split('/')[0]) : 0;
+                  const pct = (numScore / 5) * 100;
+                  const barColor = getScoreColor(numScore);
 
-            {/* LEFT COLUMN: Aspect Scorecard (NOW WITH SCROLLING & NEW UI) */}
-            <div className="w-full lg:w-[40%]">
-              <div className="sticky top-6 max-h-[calc(100vh-2rem)] overflow-y-auto pr-2 pb-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {data.scorecard && data.scorecard.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-4 text-blue-800">
-                      <Sparkles size={22} className="text-blue-600" />
-                      <h3 className="text-xl font-extrabold">Authenticity Scorecard</h3>
-                    </div>
+                  return (
+                    <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
+                      <div>
+                        <div className="flex justify-between items-start mb-3">
+                          <h4 className="font-extrabold text-gray-800 text-sm">{item.aspect}</h4>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
+                            item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {item.confidence}
+                          </span>
+                        </div>
 
-                    <div className="space-y-4">
-                      {data.scorecard.map((item, idx) => {
-                        // Extract number for the progress bar
-                        const numScore = item.score !== "N/A" ? parseFloat(item.score.split('/')[0]) : 0;
-                        const pct = (numScore / 5) * 100;
-                        const barColor = getScoreColor(numScore);
+                        <div className="flex items-baseline gap-1 mb-2">
+                          <span className="font-black text-2xl text-gray-900">{item.score !== "N/A" ? numScore.toFixed(1) : "-"}</span>
+                          {item.score !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
+                        </div>
 
-                        return (
-                          <div key={idx} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                            {/* Color-coded left edge accent */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${barColor} opacity-60 group-hover:opacity-100 transition-opacity`}></div>
-
-                            <div className="flex justify-between items-center mb-3 pl-3">
-                              <h4 className="font-extrabold text-gray-800 uppercase tracking-wider text-sm">{item.aspect}</h4>
-                              <div className="flex items-center gap-3">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
-                                    item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
-                                  }`}>
-                                  {item.confidence} Conf
-                                </span>
-                                <span className="font-mono font-black text-xl text-gray-900">{item.score}</span>
-                              </div>
-                            </div>
-
-                            {/* Progress Bar Visualizer */}
-                            {item.score !== "N/A" && (
-                              <div className="w-full bg-gray-100 rounded-full h-2 mb-4 ml-3 w-[calc(100%-12px)]">
-                                <div className={`${barColor} h-2 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }}></div>
-                              </div>
-                            )}
-
-                            {/* Evidence Pull Quote */}
-                            <div className="pl-3 mt-2">
-                              <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
-                                "{item.evidence}"
-                              </p>
-                            </div>
+                        {item.score !== "N/A" && (
+                          <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
+                            <div className={`${barColor} h-1.5 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }}></div>
                           </div>
-                        );
-                      })}
+                        )}
+                      </div>
+
+                      {/* Line-Clamp visually trims the text to 3 lines for a quick summary! */}
+                      <p className="text-xs text-gray-600 italic line-clamp-3 leading-relaxed border-l-2 border-gray-200 pl-2">
+                        "{item.evidence}"
+                      </p>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             </div>
+          )}
 
-            {/* RIGHT COLUMN: Raw Review Data Feed */}
-            <div className="w-full lg:w-[60%]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-extrabold text-gray-800">Raw Data Feed ({data.stats.total} recent reviews)</h3>
-              </div>
-              <div className="space-y-6">
-                {data.reviews.map((review, idx) => <ReviewCard key={idx} review={review} apiUrl={API_URL} />)}
-              </div>
+          {/* MIDDLE SECTION: Metrics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 border-t border-b border-gray-200 py-8">
+            <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
+            <MetricCard label="Verified Happy vs Unhappy" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
+            <MetricCard label="High Risk / Synthetic" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
+            <MetricCard label="Mismatched Sentiment" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
+          </div>
+
+          {/* BOTTOM SECTION: Full Width Raw Feed */}
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-extrabold text-gray-800">Raw Data Feed ({data.stats.total} recent reviews)</h3>
             </div>
-
+            <div className="space-y-6">
+              {data.reviews.map((review, idx) => <ReviewCard key={idx} review={review} apiUrl={API_URL} />)}
+            </div>
           </div>
         </main>
       )}
@@ -268,7 +257,7 @@ function MetricCard({ label, value, icon, color }: any) {
     yellow: "bg-yellow-50 border-yellow-200"
   };
   return (
-    <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm hover:shadow-md transition-shadow`}>
+    <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm`}>
       <div className="flex justify-center mb-3 scale-110">{icon}</div>
       <div className="text-3xl font-extrabold text-gray-900 mb-1">{value}</div>
       <div className="text-xs text-gray-600 uppercase font-bold tracking-wide">{label}</div>
@@ -290,11 +279,11 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
   };
 
   return (
-    <div className={`bg-white p-6 rounded-2xl border shadow-sm transition-all ${review.is_fake ? 'border-red-200 bg-red-50/10' : 'border-gray-200 hover:border-blue-200'}`}>
+    <div className={`bg-white p-6 rounded-2xl border shadow-sm transition-all ${review.is_fake ? 'border-red-200 bg-red-50/20' : 'border-gray-200 hover:border-blue-200'}`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider shadow-sm ${review.is_fake ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
-            {review.is_fake ? "⚠️ AI Generated or Promotional" : "✅ Genuine Reviews"}
+            {review.is_fake ? "⚠️ High Risk / Promotional" : "✅ Verified Organic"}
           </span>
           <div className="flex text-yellow-400">
             {[...Array(5)].map((_, i) => (<Star key={i} size={16} fill={i < review.stars ? "currentColor" : "none"} />))}
