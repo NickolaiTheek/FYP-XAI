@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from textblob import TextBlob
 import os
 import json
+import re
 from dotenv import load_dotenv
 from serpapi import GoogleSearch
 from google import genai
@@ -34,25 +35,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 1. LOAD AI MODEL ---
+# --- 1. LOAD V2 AI MODEL ---
 try:
-    model_path = "Models" 
+    model_path = "Models" # Make sure your V2 files are in this folder!
     tokenizer = DistilBertTokenizer.from_pretrained(model_path)
     model = DistilBertForSequenceClassification.from_pretrained(model_path)
     explainer = SequenceClassificationExplainer(model, tokenizer)
-    print("✅ AI Models loaded successfully")
+    print("✅ V2 AI Models loaded successfully")
 except Exception as e:
     print(f"❌ Model Error: {e}")
     explainer = None
 
-# --- HELPER FUNCTIONS ---
+# --- V2 FEATURE ENGINEERING HELPERS ---
 def clean_token(word):
     return word.replace("##", "").strip()
+
+def calculate_caps_ratio(text):
+    text = str(text)
+    alpha_chars = re.sub(r'[^a-zA-Z]', '', text)
+    if len(alpha_chars) == 0: return 0.0
+    caps = sum(1 for c in alpha_chars if c.isupper())
+    return caps / len(alpha_chars)
+
+def inject_metadata(text, stars, sentiment_score):
+    """Formats live text into the structure the V2 model was trained on."""
+    word_count = len(str(text).split())
+    if word_count < 15: length_tag = "SHORT"
+    elif word_count > 100: length_tag = "LONG"
+    else: length_tag = "MEDIUM"
+        
+    caps_ratio = calculate_caps_ratio(text)
+    caps_tag = "HIGH_CAPS" if caps_ratio > 0.15 else "NORM_CAPS"
+        
+    if sentiment_score > 60: sentiment_tag = "POS_SENT"
+    elif sentiment_score < 40: sentiment_tag = "NEG_SENT"
+    else: sentiment_tag = "NEU_SENT"
+
+    return f"[STARS: {int(stars)}] [LEN: {length_tag}] [{caps_tag}] [{sentiment_tag}] {text}"
 
 def analyze_risk_factors(explanation_list):
     suspicious_words = [
         (clean_token(word), score) for word, score in explanation_list 
-        if score > 0.05 and len(clean_token(word)) > 2 and word not in ["[CLS]", "[SEP]"]
+        if score > 0.05 and len(clean_token(word)) > 2 and word not in ["[CLS]", "[SEP]", "[", "]"]
     ]
     suspicious_words.sort(key=lambda x: x[1], reverse=True)
     
@@ -75,69 +99,47 @@ def analyze_risk_factors(explanation_list):
 # --- API ENDPOINTS ---
 @app.get("/")
 def home():
-    return {"message": "TrustXplain API is Online 🛡️"}
+    return {"message": "TrustXplain V2 API is Online 🛡️"}
 
-# 🔥 UPGRADED TWO-STEP LIVE SEARCH WITH JSON SCORECARD & GOOGLE RATING 🔥
 @app.get("/search")
 def search_restaurant(query: str):
     if not SERPAPI_KEY:
         raise HTTPException(status_code=500, detail="SerpApi key is missing from .env file")
     
-    # --- PHASE 1: Resolve the Restaurant Name to a Google Place ID ---
-    params_place = {
-        "engine": "google_maps",
-        "q": query,
-        "hl": "en",
-        "api_key": SERPAPI_KEY
-    }
-    
+    # --- PHASE 1: Resolve the Restaurant Name ---
+    params_place = {"engine": "google_maps", "q": query, "hl": "en", "api_key": SERPAPI_KEY}
     try:
-        search_place = GoogleSearch(params_place)
-        results_place = search_place.get_dict()
+        results_place = GoogleSearch(params_place).get_dict()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"API Error: {str(e)}")
 
-    place_id = None
-    restaurant_name = query
-    google_rating = 0.0 # 🔥 NEW VARIABLE TO STORE OFFICIAL GOOGLE RATING
+    place_id, restaurant_name, google_rating = None, query, 0.0
 
     if "place_results" in results_place:
         place_id = results_place["place_results"].get("place_id")
         restaurant_name = results_place["place_results"].get("title", query)
-        google_rating = results_place["place_results"].get("rating", 0.0) # 🔥 EXTRACT RATING
+        google_rating = results_place["place_results"].get("rating", 0.0) 
     elif "local_results" in results_place and len(results_place["local_results"]) > 0:
         place_id = results_place["local_results"][0].get("place_id")
         restaurant_name = results_place["local_results"][0].get("title", query)
-        google_rating = results_place["local_results"][0].get("rating", 0.0) # 🔥 EXTRACT RATING
+        google_rating = results_place["local_results"][0].get("rating", 0.0) 
         
-    if not place_id:
-        raise HTTPException(status_code=404, detail="Could not find this restaurant on Google Maps.")
+    if not place_id: raise HTTPException(status_code=404, detail="Could not find this place on Google Maps.")
 
-    # --- PHASE 2: Fetch 20 NEWEST Reviews using Pagination ---
+    # --- PHASE 2: Fetch 20 NEWEST Reviews ---
     raw_reviews = []
     next_page_token = None
     
     for page in range(2):
-        params_reviews = {
-            "engine": "google_maps_reviews",
-            "place_id": place_id,
-            "hl": "en",
-            "sort_by": "newestFirst", 
-            "api_key": SERPAPI_KEY
-        }
-        if next_page_token:
-            params_reviews["next_page_token"] = next_page_token
+        params_reviews = {"engine": "google_maps_reviews", "place_id": place_id, "hl": "en", "sort_by": "newestFirst", "api_key": SERPAPI_KEY}
+        if next_page_token: params_reviews["next_page_token"] = next_page_token
             
         try:
-            search_reviews = GoogleSearch(params_reviews)
-            results_reviews = search_reviews.get_dict()
-            fetched_reviews = results_reviews.get("reviews", [])
-            raw_reviews.extend(fetched_reviews)
-            
+            results_reviews = GoogleSearch(params_reviews).get_dict()
+            raw_reviews.extend(results_reviews.get("reviews", []))
             if "serpapi_pagination" in results_reviews and "next_page_token" in results_reviews["serpapi_pagination"]:
                 next_page_token = results_reviews["serpapi_pagination"]["next_page_token"]
-            else:
-                break 
+            else: break 
         except Exception as e:
             if page == 0: raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
             else: break 
@@ -145,14 +147,9 @@ def search_restaurant(query: str):
     raw_reviews = raw_reviews[:20]
     if not raw_reviews: raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
-    # --- PHASE 3: Batch Process through AI Models ---
-    total = 0
-    fakes = 0
-    reviews_data = []
-    genuine_texts = [] 
-    
-    genuine_positive = 0
-    genuine_negative = 0
+    # --- PHASE 3: Batch Process through V2 AI Model ---
+    total, fakes, genuine_positive, genuine_negative = 0, 0, 0, 0
+    reviews_data, genuine_texts = [], []
     
     for rev in raw_reviews:
         text = rev.get("snippet", "")
@@ -161,13 +158,18 @@ def search_restaurant(query: str):
         if not text or len(text) < 10: continue 
         total += 1
         
-        inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+        # 1. Calculate Sentiment Base
+        try: sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
+        except: sentiment_score = 50
+        
+        # 2. INJECT METADATA FOR V2 MODEL
+        injected_text = inject_metadata(text, stars, sentiment_score)
+        
+        # 3. Model Inference
+        inputs = tokenizer(injected_text, return_tensors="pt", truncation=True, max_length=512)
         with torch.no_grad(): outputs = model(**inputs)
         probs = torch.nn.functional.softmax(outputs.logits, dim=1)
         is_fake = probs[0][1].item() > 0.5
-        
-        try: sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
-        except: sentiment_score = 50
         
         if is_fake: 
             fakes += 1
@@ -178,11 +180,10 @@ def search_restaurant(query: str):
             
         rating_score = int((stars / 5) * 100)
         is_mismatch = abs(rating_score - sentiment_score) > 40
-        review_date = rev.get("date", "Recent")
 
         reviews_data.append({
             "author": rev.get("user", {}).get("name", "Anonymous"),
-            "date": review_date,
+            "date": rev.get("date", "Recent"),
             "text": text,
             "stars": stars,
             "is_fake": is_fake,
@@ -194,7 +195,7 @@ def search_restaurant(query: str):
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
     
-    # --- PHASE 4: Generate Structured Aspect Scorecard via LLM ---
+    # --- PHASE 4: Authenticity-Gated ABSA via LLM ---
     scorecard_data = []
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
@@ -215,14 +216,13 @@ def search_restaurant(query: str):
         {combined_text}
         """
         try:
-            response = gemini_client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-            )
+            response = gemini_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
             raw_text = response.text.strip()
-            if raw_text.startswith("```json"):
+            
+            # --- FIXING THE TRUNCATION HERE ---
+            if raw_text.startswith("```json"): 
                 raw_text = raw_text[7:-3].strip()
-            elif raw_text.startswith("```"):
+            elif raw_text.startswith("```"): 
                 raw_text = raw_text[3:-3].strip()
                 
             scorecard_data = json.loads(raw_text)
@@ -234,14 +234,12 @@ def search_restaurant(query: str):
         "restaurant_name": restaurant_name,
         "stats": {
             "total": total, "fakes": fakes, "real": real, "trust_score": trust_score,
-            "google_rating": google_rating, # 🔥 PASSED GOOGLE RATING INSTEAD OF VERIFIED RATING
-            "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
+            "google_rating": google_rating, "genuine_positive": genuine_positive, "genuine_negative": genuine_negative
         },
         "scorecard": scorecard_data,
         "reviews": reviews_data
     }
 
-# --- YOUR EXISTING EXPLAIN ENDPOINT (UNTOUCHED) ---
 class ExplainRequest(BaseModel):
     text: str
     stars: int 
@@ -250,19 +248,23 @@ class ExplainRequest(BaseModel):
 def explain_review(request: ExplainRequest):
     if not explainer: raise HTTPException(status_code=500, detail="Model not active")
     
-    inputs = tokenizer(request.text, return_tensors="pt", truncation=True, max_length=512)
+    # 1. Base Sentiment
+    try: sentiment_score = int((TextBlob(request.text).sentiment.polarity + 1) * 50) 
+    except: sentiment_score = 50 
+
+    # 2. INJECT METADATA FOR V2 EXPLAINER
+    injected_text = inject_metadata(request.text, request.stars, sentiment_score)
+
+    # 3. Model Inference
+    inputs = tokenizer(injected_text, return_tensors="pt", truncation=True, max_length=512)
     with torch.no_grad(): outputs = model(**inputs)
     
     probs = torch.nn.functional.softmax(outputs.logits, dim=1)
     fake_prob = probs[0][1].item()
     risk_percent = int(fake_prob * 100)
 
-    word_attributions = explainer(request.text, class_name="LABEL_1")
-
-    try:
-        sentiment_score = int((TextBlob(request.text).sentiment.polarity + 1) * 50) 
-    except:
-        sentiment_score = 50 
+    # 4. Generate XAI based on injected text
+    word_attributions = explainer(injected_text, class_name="LABEL_1")
 
     rating_score = int((request.stars / 5) * 100)
     consistency_gap = abs(rating_score - sentiment_score)
@@ -282,28 +284,29 @@ def explain_review(request: ExplainRequest):
         badges.append({"label": "Consistent Rating", "type": "green", "icon": "✅"})
         if risk_percent < 15: badges.append({"label": "Specific Details", "type": "green", "icon": "🛡️"})
 
-    suspicious_word_list = [item['word'] for item in evidence[:3]]
+    suspicious_word_list = [item['word'] for item in evidence[:3] if item['word'].isalpha()]
     suspicious_str = ", ".join(f"'{w}'" for w in suspicious_word_list)
 
     if risk_percent > 65:
         verdict = "CRITICAL ISSUES FOUND"
         verdict_color = "red"
         if suspicious_str:
-            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated emotional phrasing, unusual repetition, and platform-related wording patterns (such as {suspicious_str}) often found in synthetic or promotional content."
+            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated phrasing and metadata patterns (such as {suspicious_str}) often found in synthetic or promotional content."
         else:
-            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses exaggerated emotional phrasing, unusual structural patterns, and repetition often found in synthetic or promotional content."
+            summary = f"This review was flagged as High Risk ({risk_percent}%). It uses structural metadata patterns and repetition often found in synthetic or promotional content."
             
     elif risk_percent > 45:
         verdict = "INCONCLUSIVE / MIXED SIGNALS"
         verdict_color = "orange" 
-        summary = f"This analysis is Inconclusive ({risk_percent}% Risk). The review contains a blend of genuine-sounding details and generic phrasing, making it difficult to fully verify its authenticity."
+        summary = f"This analysis is Inconclusive ({risk_percent}% Risk). The review contains a blend of genuine-sounding details and generic phrasing."
         
     else:
         verdict = "AUTHENTICITY VERIFIED"
         verdict_color = "green"
         summary = f"This review appears Authentic ({100 - risk_percent}% confidence). The language, phrasing, and contextual details align closely with natural human feedback patterns."
 
-    clean_raw_data = [{"word": clean_token(w), "score": round(s, 3)} for w, s in word_attributions if w not in ["[CLS]", "[SEP]"]]
+    # Filter out our injected brackets and structural tokens from the frontend view
+    clean_raw_data = [{"word": clean_token(w), "score": round(s, 3)} for w, s in word_attributions if w not in ["[CLS]", "[SEP]", "[", "]", ":"]]
 
     return {
         "risk_score": risk_percent, "verdict": verdict, "verdict_color": verdict_color,

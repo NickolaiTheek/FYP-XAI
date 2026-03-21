@@ -17,7 +17,6 @@ interface EvidenceItem { word: string; impact: string; color: string; }
 interface RawExplanationItem { word: string; score: number; }
 interface TrustBadge { label: string; type: string; icon: string; }
 
-// 🔥 NEW SCORECARD INTERFACE 🔥
 interface ScorecardItem {
   aspect: string;
   score: string;
@@ -33,10 +32,10 @@ interface AuditReport {
 
 interface DashboardData {
   restaurant_name: string;
-  scorecard: ScorecardItem[]; // 🔥 REPLACED AI_SUMMARY WITH SCORECARD ARRAY
+  scorecard: ScorecardItem[];
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    google_rating: number; genuine_positive: number; genuine_negative: number; // 🔥 UPDATED TO GOOGLE RATING
+    google_rating: number; genuine_positive: number; genuine_negative: number;
   };
   reviews: Review[];
 }
@@ -159,7 +158,6 @@ export default function Home() {
         <main className="max-w-5xl mx-auto animate-fade-in w-full">
           <h2 className="text-3xl font-extrabold text-gray-900 mb-6">{data.restaurant_name}</h2>
 
-          {/* 🔥 NEW ASPECT SCORECARD TABLE 🔥 */}
           {data.scorecard && data.scorecard.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-8 shadow-sm">
               <div className="flex items-center gap-2 mb-2 text-blue-800">
@@ -200,7 +198,6 @@ export default function Home() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            {/* 🔥 UPDATED METRICS DASHBOARD FOR SIMPLICITY 🔥 */}
             <MetricCard label="Review Honesty (%)" value={`${data.stats.trust_score}%`} icon={<ShieldCheck className="text-blue-600" />} color="blue" />
             <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
             <MetricCard label="Verified Happy vs Unhappy Customers" value={`${data.stats.genuine_positive} 😊 | ${data.stats.genuine_negative} 😠`} icon={<CheckCircle className="text-green-600" />} color="green" />
