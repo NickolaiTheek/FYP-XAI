@@ -166,7 +166,7 @@ export default function Home() {
           <div className="mb-8">
             <h2 className="text-4xl font-black text-gray-900">{data.restaurant_name}</h2>
             <p className="text-gray-500 mt-2 font-medium flex items-center gap-2">
-              <Sparkles size={16} className="text-blue-500" /> AI-Generated Authenticity Report based on recent verified reviews.
+              <Sparkles size={16} className="text-blue-500" /> Summary.
             </p>
           </div>
 
