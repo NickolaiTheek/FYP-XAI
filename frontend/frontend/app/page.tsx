@@ -35,7 +35,7 @@ interface DashboardData {
   scorecard: ScorecardItem[];
   stats: {
     trust_score: number; real: number; fakes: number; total: number;
-    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number; 
+    google_rating: number; genuine_positive: number; genuine_neutral: number; genuine_negative: number;
   };
   reviews: Review[];
 }
@@ -116,7 +116,7 @@ export default function Home() {
                 <input type="text" placeholder=" " className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
                 <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">Search</button>
               </div>
-              
+
               {/* NEW: Scan Depth Selector */}
               <div className="mt-5 flex justify-center items-center gap-3 animate-fade-in-up">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Scan Depth:</span>
@@ -201,7 +201,7 @@ export default function Home() {
                         <div className="flex justify-between items-start mb-3">
                           <h4 className="font-extrabold text-gray-800 text-sm">{item.aspect}</h4>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
-                              item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
+                            item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
                             }`}>
                             {item.confidence}
                           </span>
