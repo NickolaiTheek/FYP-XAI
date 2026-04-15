@@ -1,6 +1,6 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, XCircle, Zap } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Clock, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, XCircle, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -124,35 +124,44 @@ export default function Home() {
                 <div className="flex bg-white/70 backdrop-blur-md p-1.5 rounded-2xl border border-gray-200 shadow-sm">
                   <button
                     onClick={() => setScanDepth(10)}
-                    className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-200 ${scanDepth === 10
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 10
                         ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
                       }`}
                   >
                     <span className="font-bold text-sm">Quick Scan</span>
-                    <span className={`text-[10px] font-semibold mt-0.5 ${scanDepth === 10 ? 'text-blue-500' : 'text-gray-400'}`}>10 items (~3s)</span>
+                    <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 10 ? 'text-gray-600' : 'text-gray-400'}`}>10 Reviews</span>
+                    <span className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${scanDepth === 10 ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <Clock size={11} /> 3-5 Seconds
+                    </span>
                   </button>
 
                   <button
                     onClick={() => setScanDepth(20)}
-                    className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-200 ${scanDepth === 20
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 20
                         ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
                       }`}
                   >
                     <span className="font-bold text-sm">Standard</span>
-                    <span className={`text-[10px] font-semibold mt-0.5 ${scanDepth === 20 ? 'text-blue-500' : 'text-gray-400'}`}>20 items (~8s)</span>
+                    <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 20 ? 'text-gray-600' : 'text-gray-400'}`}>20 Reviews</span>
+                    <span className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${scanDepth === 20 ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <Clock size={11} /> 8-15 Seconds
+                    </span>
                   </button>
 
                   <button
                     onClick={() => setScanDepth(50)}
-                    className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-200 ${scanDepth === 50
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 50
                         ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
                       }`}
                   >
-                    <span className="font-bold text-sm">Deep Audit</span>
-                    <span className={`text-[10px] font-semibold mt-0.5 ${scanDepth === 50 ? 'text-blue-500' : 'text-gray-400'}`}>50 items (~15s)</span>
+                    <span className="font-bold text-sm">Deep Scan</span>
+                    <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 50 ? 'text-gray-600' : 'text-gray-400'}`}>50 Reviews</span>
+                    <span className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${scanDepth === 50 ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <Clock size={11} /> 15-30 Seconds
+                    </span>
                   </button>
                 </div>
               </div>
