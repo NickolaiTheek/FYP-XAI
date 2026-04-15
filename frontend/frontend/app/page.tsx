@@ -1,6 +1,6 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Clock, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, XCircle, Zap, ZoomIn, X } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Clock, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, X, XCircle, Zap, ZoomIn } from 'lucide-react';
 import { useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -17,14 +17,14 @@ interface EvidenceItem { word: string; impact: string; color: string; }
 interface RawExplanationItem { word: string; score: number; }
 interface TrustBadge { label: string; type: string; icon: string; }
 
-// UPDATED: Added optional flags (?) to prevent strict TypeScript build errors on Vercel
+// Safely typed to prevent Vercel Build Crashes
 interface ScorecardItem {
   aspect: string;
   score: string;
   confidence: string;
   short_quote?: string;
   detailed_summary?: string;
-  evidence?: string; 
+  evidence?: string;
 }
 
 interface AuditReport {
@@ -46,7 +46,7 @@ interface DashboardData {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'search' | 'live'>('search');
   const [searchQuery, setSearchQuery] = useState('');
-  const [scanDepth, setScanDepth] = useState<number>(20); 
+  const [scanDepth, setScanDepth] = useState<number>(20);
   const [data, setData] = useState<DashboardData | null>(null);
 
   // Modal State
@@ -122,19 +122,17 @@ export default function Home() {
                 <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">Search</button>
               </div>
 
-              {/* ULTRA-MODERN MINIMALIST SCAN SELECTOR */}
               <div className="animate-fade-in-up max-w-lg mx-auto">
                 <div className="flex items-center justify-center mb-2">
                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Scan Volume</span>
                 </div>
                 <div className="flex bg-white/70 backdrop-blur-md p-1.5 rounded-2xl border border-gray-200 shadow-sm">
-                  <button 
+                  <button
                     onClick={() => setScanDepth(10)}
-                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${
-                      scanDepth === 10 
-                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' 
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 10
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
-                    }`}
+                      }`}
                   >
                     <span className="font-bold text-sm">Quick Scan</span>
                     <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 10 ? 'text-gray-600' : 'text-gray-400'}`}>10 Reviews</span>
@@ -143,13 +141,12 @@ export default function Home() {
                     </span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => setScanDepth(20)}
-                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${
-                      scanDepth === 20 
-                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' 
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 20
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
-                    }`}
+                      }`}
                   >
                     <span className="font-bold text-sm">Standard</span>
                     <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 20 ? 'text-gray-600' : 'text-gray-400'}`}>20 Reviews</span>
@@ -158,13 +155,12 @@ export default function Home() {
                     </span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => setScanDepth(50)}
-                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${
-                      scanDepth === 50 
-                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50' 
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 50
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
-                    }`}
+                      }`}
                   >
                     <span className="font-bold text-sm">Deep Scan</span>
                     <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 50 ? 'text-gray-600' : 'text-gray-400'}`}>50 Reviews</span>
@@ -244,8 +240,8 @@ export default function Home() {
                   const isClickable = item.score !== "N/A";
 
                   return (
-                    <div 
-                      key={idx} 
+                    <div
+                      key={idx}
                       onClick={() => isClickable && setSelectedCard(item)}
                       className={`bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between h-full transition-all duration-200 group
                         ${isClickable ? 'cursor-pointer hover:shadow-lg hover:border-blue-300 hover:-translate-y-1' : 'opacity-80'}`}
@@ -277,7 +273,7 @@ export default function Home() {
                         <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic flex-grow">
                           "{item.short_quote || item.evidence || "Analyzing data..."}"
                         </p>
-                        
+
                         {/* Interactive Hint */}
                         {isClickable && (
                           <div className="flex items-center justify-end gap-1 mt-2 text-blue-500 font-bold text-[10px] uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
@@ -302,4 +298,188 @@ export default function Home() {
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-green-600">{data.stats.genuine_positive} Pos</span>
                   <span className="text-gray-300 text-2xl font-light">|</span>
-                  <span className="text-yellow-500">{data.
+                  <span className="text-yellow-500">{data.stats.genuine_neutral} Neu</span>
+                  <span className="text-gray-300 text-2xl font-light">|</span>
+                  <span className="text-red-500">{data.stats.genuine_negative} Neg</span>
+                </div>
+              }
+              icon={<CheckCircle className="text-green-600" />}
+              color="green"
+            />
+
+            <MetricCard label="High Risk / Synthetic" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
+            <MetricCard label="Mismatched Sentiment" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
+          </div>
+
+          {/* BOTTOM SECTION: Full Width Raw Feed */}
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-extrabold text-gray-800">Raw Data Feed ({data.stats.total} recent reviews)</h3>
+            </div>
+            <div className="space-y-6">
+              {data.reviews.map((review, idx) => <ReviewCard key={idx} review={review} apiUrl={API_URL} />)}
+            </div>
+          </div>
+        </main>
+      )}
+
+      {liveReport && !loading && (
+        <main className="max-w-4xl mx-auto animate-fade-in w-full mt-10">
+          <div className="bg-white p-6 md:p-8 rounded-2xl border border-gray-200 shadow-xl">
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg italic text-gray-700 border-l-4 border-blue-400 shadow-sm text-lg">"{liveText}"</div>
+            <AuditResultView report={liveReport} onClose={() => { }} isStatic={true} />
+          </div>
+        </main>
+      )}
+
+      {/* DETAILED SUMMARY MODAL POPUP */}
+      {selectedCard && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in"
+          onClick={() => setSelectedCard(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col border border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/80">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-700 p-2 rounded-lg shadow-sm">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-gray-900">{selectedCard.aspect}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-sm font-bold text-gray-700">Score: {selectedCard.score}</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                      {selectedCard.confidence} Confidence
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedCard(null)}
+                className="text-gray-400 hover:text-gray-800 bg-gray-200/50 hover:bg-gray-200 p-2 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 bg-white">
+              <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Info size={14} className="text-blue-400" /> Detailed Insight Summary
+              </h4>
+              <p className="text-gray-700 leading-relaxed text-[15px]">
+                {selectedCard.detailed_summary || selectedCard.short_quote || selectedCard.evidence || "No detailed summary available for this aspect."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- COMPONENTS ---
+function MetricCard({ label, value, icon, color }: any) {
+  const colors: any = {
+    blue: "bg-blue-50 border-blue-200",
+    green: "bg-green-50 border-green-200",
+    red: "bg-red-50 border-red-200",
+    orange: "bg-orange-50 border-orange-200",
+    yellow: "bg-yellow-50 border-yellow-200"
+  };
+  return (
+    <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm`}>
+      <div className="flex justify-center mb-3 scale-110">{icon}</div>
+      <div className="text-3xl font-extrabold text-gray-900 mb-2">{value}</div>
+      <div className="text-[11px] text-gray-500 uppercase font-black tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
+  const [report, setReport] = useState<AuditReport | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleExplain = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${apiUrl}/explain`, { text: review.text, stars: review.stars });
+      setReport(res.data);
+    } catch (err) { alert("Analysis failed."); }
+    setLoading(false);
+  };
+
+  return (
+    <div className={`bg-white p-6 rounded-2xl border shadow-sm transition-all ${review.is_fake ? 'border-red-200 bg-red-50/20' : 'border-gray-200 hover:border-blue-200'}`}>
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-3">
+          <span className={`px-3 py-1.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider shadow-sm ${review.is_fake ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
+            {review.is_fake ? "⚠️ High Risk / Promotional" : "✅ Verified Organic"}
+          </span>
+          <div className="flex text-yellow-400">
+            {[...Array(5)].map((_, i) => (<Star key={i} size={16} fill={i < review.stars ? "currentColor" : "none"} />))}
+          </div>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-sm font-bold text-gray-800">{review.author}</span>
+          {review.date && (
+            <span className="text-xs font-medium text-gray-400 mt-1">{review.date}</span>
+          )}
+        </div>
+      </div>
+      {!report && <p className="text-gray-700 mb-5 leading-relaxed text-[15px]">{review.text}</p>}
+      {report && <div className="mt-4"><AuditResultView report={report} onClose={() => setReport(null)} isStatic={false} /></div>}
+      {!report && (
+        <button onClick={handleExplain} disabled={loading} className="text-sm font-bold text-blue-600 flex items-center gap-2 hover:text-blue-800 bg-blue-50 px-4 py-2 rounded-lg transition-colors">
+          {loading ? <BrainCircuit size={16} className="animate-spin" /> : <BrainCircuit size={16} />} Run Deep XAI Audit
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AuditResultView({ report, onClose, isStatic }: { report: AuditReport, onClose: () => void, isStatic: boolean }) {
+  const theme = {
+    red: { border: "border-red-200", bg: "bg-red-50/50", headerBg: "bg-red-100/80", headerText: "text-red-900", icon: <ShieldAlert size={18} /> },
+    orange: { border: "border-yellow-200", bg: "bg-yellow-50/50", headerBg: "bg-yellow-100/80", headerText: "text-yellow-900", icon: <AlertTriangle size={18} /> },
+    green: { border: "border-green-200", bg: "bg-green-50/50", headerBg: "bg-green-100/80", headerText: "text-green-900", icon: <ShieldCheck size={18} /> }
+  }[report.verdict_color] || { border: "border-gray-200", bg: "bg-gray-50", headerBg: "bg-gray-100", headerText: "text-gray-900", icon: <Info size={18} /> };
+
+  return (
+    <div className={`rounded-xl border overflow-hidden mb-2 shadow-inner ${theme.border} ${theme.bg}`}>
+      <div className={`p-4 border-b flex justify-between items-center ${theme.headerBg} ${theme.border}`}>
+        <h4 className={`font-black text-sm uppercase flex items-center gap-2 tracking-wide ${theme.headerText}`}>{theme.icon} {report.verdict}</h4>
+        {!isStatic && <button onClick={onClose} className="text-[10px] font-black tracking-wider text-gray-500 hover:text-gray-900 uppercase bg-white/50 px-2 py-1 rounded">CLOSE</button>}
+      </div>
+      <div className="p-5 bg-white/80">
+        <div className="mb-5 text-sm font-medium text-gray-800 leading-relaxed border-l-2 border-gray-300 pl-3">{report.summary}</div>
+        <div>
+          <h5 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Search size={14} className="text-gray-400" /> Evidence Highlights (Hover)</h5>
+          <div className="text-gray-800 text-[15px] leading-[2.2] bg-white p-5 rounded-lg border border-gray-100 font-mono shadow-sm">
+            {report.raw_explanation?.map((item, i) => {
+              if (item.score > 0.05) return <HighlightWithTooltip key={i} word={item.word} colorClass="bg-red-100 text-red-900 border-b-2 border-red-400 font-bold" tooltipText={`+${Math.round(item.score * 100)}% risk factor`} />;
+              if (item.score < -0.05) return <HighlightWithTooltip key={i} word={item.word} colorClass="bg-green-100 text-green-900 border-b-2 border-green-400" tooltipText={`+${Math.round(Math.abs(item.score) * 100)}% authenticity`} />;
+              return <span key={i}>{item.word} </span>;
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HighlightWithTooltip({ word, colorClass, tooltipText }: { word: string, colorClass: string, tooltipText: string }) {
+  return (
+    <span className="group relative inline-block cursor-help">
+      <span className={`px-1.5 py-0.5 rounded-sm ${colorClass}`}>{word}</span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-gray-900 text-white text-[11px] font-bold tracking-wide rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+        {tooltipText}
+      </span><span> </span>
+    </span>
+  );
+}

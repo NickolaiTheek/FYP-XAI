@@ -208,7 +208,6 @@ def search_restaurant(query: str, limit: int = 20):
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
         
-        # --- NEW PROMPT FOR DETAILED SUMMARIES ---
         prompt = f"""
         You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
         I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
@@ -237,12 +236,14 @@ def search_restaurant(query: str, limit: int = 20):
             response = gemini_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
             raw_text = response.text.strip()
             
-            if raw_text.startswith("```json"): 
-                raw_text = raw_text[7:-3].strip()
-            elif raw_text.startswith("```"): 
-                raw_text = raw_text[3:-3].strip()
+            # BULLETPROOF JSON EXTRACTION
+            json_match = re.search(r'\[.*\]', raw_text, re.DOTALL)
+            if json_match:
+                scorecard_data = json.loads(json_match.group(0))
+            else:
+                print("Failed to find JSON array in response")
+                scorecard_data = []
                 
-            scorecard_data = json.loads(raw_text)
         except Exception as e:
             print("Gemini API/JSON Parse Error:", e)
             scorecard_data = []
