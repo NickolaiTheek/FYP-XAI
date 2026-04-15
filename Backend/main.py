@@ -129,7 +129,6 @@ def search_restaurant(query: str, limit: int = 20):
     valid_reviews = []
     next_page_token = None
     
-    # Cap at 10 pages (approx 100 raw reviews) to prevent infinite loops and save API credits
     for page in range(10):
         params_reviews = {"engine": "google_maps_reviews", "place_id": place_id, "hl": "en", "sort_by": "newestFirst", "api_key": SERPAPI_KEY}
         if next_page_token: params_reviews["next_page_token"] = next_page_token
@@ -138,7 +137,6 @@ def search_restaurant(query: str, limit: int = 20):
             results_reviews = GoogleSearch(params_reviews).get_dict()
             fetched_reviews = results_reviews.get("reviews", [])
             
-            # Pre-filter: Only count reviews that actually have text!
             for rev in fetched_reviews:
                 text = rev.get("snippet", "")
                 if text and len(text) >= 10:
@@ -149,7 +147,6 @@ def search_restaurant(query: str, limit: int = 20):
             else: 
                 break 
                 
-            # Stop paginating if we have collected enough valid text reviews
             if len(valid_reviews) >= limit:
                 break
                 
@@ -157,7 +154,6 @@ def search_restaurant(query: str, limit: int = 20):
             if page == 0: raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
             else: break 
                 
-    # Slice to exact limit requested
     raw_reviews = valid_reviews[:limit]
     if not raw_reviews: raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
@@ -212,6 +208,7 @@ def search_restaurant(query: str, limit: int = 20):
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
         
+        # --- NEW PROMPT FOR DETAILED SUMMARIES ---
         prompt = f"""
         You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
         I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
@@ -219,12 +216,19 @@ def search_restaurant(query: str, limit: int = 20):
         Return ONLY a raw JSON array. Do not include markdown formatting, backticks, or extra text.
         Format EXACTLY like this:
         [
-          {{"aspect": "Food Quality", "score": "4.5/5", "confidence": "High", "evidence": "Praised for 'lovely tasty' food, though one noted 'pile of grease'."}},
-          {{"aspect": "Service", "score": "1.0/5", "confidence": "High", "evidence": "Called a 'catastrophe' with 'extremely poor waiting staff'."}}
+          {{
+            "aspect": "Food Quality", 
+            "score": "4.5/5", 
+            "confidence": "High", 
+            "short_quote": "Praised for 'lovely tasty' food, though one noted 'pile of grease'.",
+            "detailed_summary": "Most customers highly praised the taste and portion sizes, noting the pizza was large and delicious. However, a few isolated reviews mentioned occasional greasiness or minor inconsistencies in temperature."
+          }}
         ]
         
-        CRITICAL RULE: The 'evidence' field MUST use short, direct quotes from the reviews to capture the authentic user voice. Keep the total length under 15 words per aspect. Stitch together 1 to 3 impactful quoted phrases. Do NOT write long paragraphs. 
-        If an aspect is not mentioned enough to score, set the score to "N/A", confidence to "Low", and evidence to "Not enough data".
+        CRITICAL RULES:
+        1. 'short_quote': MUST be under 15 words. Stitch together 1 to 3 impactful quoted phrases to capture the authentic user voice.
+        2. 'detailed_summary': MUST be a 30-40 word comprehensive summary combining multiple customer opinions. Write in a professional, analytical tone.
+        3. If an aspect is not mentioned enough to score, set score to "N/A", confidence to "Low", and both text fields to "Not enough data".
         
         Reviews:
         {combined_text}

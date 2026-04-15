@@ -1,6 +1,6 @@
 "use client";
 import axios from 'axios';
-import { AlertTriangle, BrainCircuit, CheckCircle, Clock, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, XCircle, Zap } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, CheckCircle, Clock, Info, Search, ShieldAlert, ShieldCheck, Sparkles, Star, X, XCircle, Zap, ZoomIn } from 'lucide-react';
 import { useState } from 'react';
 
 // --- TYPE DEFINITIONS ---
@@ -17,11 +17,13 @@ interface EvidenceItem { word: string; impact: string; color: string; }
 interface RawExplanationItem { word: string; score: number; }
 interface TrustBadge { label: string; type: string; icon: string; }
 
+// UPDATED: Now supports short_quote and detailed_summary
 interface ScorecardItem {
   aspect: string;
   score: string;
   confidence: string;
-  evidence: string;
+  short_quote: string;
+  detailed_summary: string;
 }
 
 interface AuditReport {
@@ -45,6 +47,9 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [scanDepth, setScanDepth] = useState<number>(20);
   const [data, setData] = useState<DashboardData | null>(null);
+
+  // NEW: State to manage the popup modal
+  const [selectedCard, setSelectedCard] = useState<ScorecardItem | null>(null);
 
   const [liveText, setLiveText] = useState('');
   const [liveStars, setLiveStars] = useState(5);
@@ -216,7 +221,7 @@ export default function Home() {
       )}
 
       {data && !loading && (
-        <main className="max-w-[98%] xl:max-w-7xl mx-auto animate-fade-in w-full">
+        <main className="max-w-[98%] xl:max-w-7xl mx-auto animate-fade-in w-full relative">
           <div className="mb-8">
             <h2 className="text-4xl font-black text-gray-900">{data.restaurant_name}</h2>
             <p className="text-gray-500 mt-2 font-medium flex items-center gap-2">
@@ -232,9 +237,15 @@ export default function Home() {
                   const numScore = item.score !== "N/A" ? parseFloat(item.score.split('/')[0]) : 0;
                   const pct = (numScore / 5) * 100;
                   const barColor = getScoreColor(numScore);
+                  const isClickable = item.score !== "N/A";
 
                   return (
-                    <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
+                    <div
+                      key={idx}
+                      onClick={() => isClickable && setSelectedCard(item)}
+                      className={`bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between h-full transition-all duration-200 group
+                        ${isClickable ? 'cursor-pointer hover:shadow-lg hover:border-blue-300 hover:-translate-y-1' : 'opacity-80'}`}
+                    >
                       <div>
                         <div className="flex justify-between items-start mb-3">
                           <h4 className="font-extrabold text-gray-800 text-sm">{item.aspect}</h4>
@@ -258,10 +269,17 @@ export default function Home() {
                       </div>
 
                       {/* Authentic Quote Box */}
-                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2">
-                        <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic">
-                          {item.evidence}
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2 flex flex-col grow">
+                        <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic flex-grow">
+                          "{item.short_quote || item.evidence}"
                         </p>
+
+                        {/* Interactive Hint */}
+                        {isClickable && (
+                          <div className="flex items-center justify-end gap-1 mt-2 text-blue-500 font-bold text-[10px] uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
+                            <ZoomIn size={12} /> View Details
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -312,6 +330,54 @@ export default function Home() {
             <AuditResultView report={liveReport} onClose={() => { }} isStatic={true} />
           </div>
         </main>
+      )}
+
+      {/* NEW: DETAILED SUMMARY MODAL POPUP */}
+      {selectedCard && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in"
+          onClick={() => setSelectedCard(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col border border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/80">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-700 p-2 rounded-lg shadow-sm">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-gray-900">{selectedCard.aspect}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-sm font-bold text-gray-700">Score: {selectedCard.score}</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                      {selectedCard.confidence} Confidence
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedCard(null)}
+                className="text-gray-400 hover:text-gray-800 bg-gray-200/50 hover:bg-gray-200 p-2 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 bg-white">
+              <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Info size={14} className="text-blue-400" /> Detailed Insight Summary
+              </h4>
+              <p className="text-gray-700 leading-relaxed text-[15px]">
+                {selectedCard.detailed_summary || selectedCard.short_quote || selectedCard.evidence}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
