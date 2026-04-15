@@ -43,7 +43,7 @@ interface DashboardData {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'search' | 'live'>('search');
   const [searchQuery, setSearchQuery] = useState('');
-  const [scanDepth, setScanDepth] = useState<number>(20); // NEW: Scan depth state
+  const [scanDepth, setScanDepth] = useState<number>(20);
   const [data, setData] = useState<DashboardData | null>(null);
 
   const [liveText, setLiveText] = useState('');
@@ -60,7 +60,6 @@ export default function Home() {
     if (!searchQuery) return;
     setLoading(true); setError(''); setData(null);
     try {
-      // NEW: Pass the scanDepth limit to the backend
       const res = await axios.get(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}&limit=${scanDepth}`);
       setData(res.data);
     } catch (err: any) {
@@ -110,24 +109,74 @@ export default function Home() {
             </div>
           </div>
           {activeTab === 'search' ? (
-            <div className="w-full max-w-2xl mx-auto mb-12">
-              <div className="bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 transition-transform hover:scale-[1.01]">
+            <div className="w-full max-w-3xl mx-auto mb-12">
+              <div className="bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 transition-transform hover:scale-[1.01] mb-8">
                 <Search className="text-gray-400 ml-5" size={22} />
-                <input type="text" placeholder=" " className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+                <input type="text" placeholder="Search for a restaurant..." className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
                 <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">Search</button>
               </div>
 
-              {/* NEW: Scan Depth Selector */}
-              <div className="mt-5 flex justify-center items-center gap-3 animate-fade-in-up">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Scan Depth:</span>
-                <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <button onClick={() => setScanDepth(10)} className={`px-4 py-2 text-xs font-bold transition-colors ${scanDepth === 10 ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>Quick (10)</button>
-                  <div className="w-px bg-gray-200"></div>
-                  <button onClick={() => setScanDepth(20)} className={`px-4 py-2 text-xs font-bold transition-colors ${scanDepth === 20 ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>Standard (20)</button>
-                  <div className="w-px bg-gray-200"></div>
-                  <button onClick={() => setScanDepth(50)} className={`px-4 py-2 text-xs font-bold transition-colors ${scanDepth === 50 ? 'bg-blue-50 text-blue-700 flex items-center gap-1' : 'text-gray-600 hover:bg-gray-50 flex items-center gap-1'}`}>Deep (50)</button>
+              {/* MODERN SCAN DEPTH SELECTOR */}
+              <div className="animate-fade-in-up">
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <Sparkles size={18} className="text-blue-500" />
+                  <span className="text-sm font-extrabold text-gray-500 uppercase tracking-widest">Select Analysis Depth</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Quick Scan */}
+                  <button
+                    onClick={() => setScanDepth(10)}
+                    className={`relative flex flex-col items-center p-5 rounded-2xl border-2 transition-all duration-200 ${scanDepth === 10
+                        ? 'border-blue-500 bg-blue-50/50 shadow-lg shadow-blue-100/50 scale-105 z-10'
+                        : 'border-transparent bg-white shadow-sm hover:border-blue-100 hover:bg-gray-50'
+                      }`}
+                  >
+                    {scanDepth === 10 && <div className="absolute -top-3 bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">Selected</div>}
+                    <Zap size={28} className={`mb-3 ${scanDepth === 10 ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <h3 className={`font-extrabold text-lg mb-1 ${scanDepth === 10 ? 'text-blue-900' : 'text-gray-700'}`}>Quick Scan</h3>
+                    <p className="text-sm font-medium text-gray-500 mb-4">10 Reviews</p>
+                    <div className={`text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg ${scanDepth === 10 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
+                      ⏱️ ~3 Seconds
+                    </div>
+                  </button>
+
+                  {/* Standard Audit */}
+                  <button
+                    onClick={() => setScanDepth(20)}
+                    className={`relative flex flex-col items-center p-5 rounded-2xl border-2 transition-all duration-200 ${scanDepth === 20
+                        ? 'border-blue-500 bg-blue-50/50 shadow-lg shadow-blue-100/50 scale-105 z-10'
+                        : 'border-transparent bg-white shadow-sm hover:border-blue-100 hover:bg-gray-50'
+                      }`}
+                  >
+                    {scanDepth === 20 && <div className="absolute -top-3 bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">Selected</div>}
+                    <ShieldCheck size={28} className={`mb-3 ${scanDepth === 20 ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <h3 className={`font-extrabold text-lg mb-1 ${scanDepth === 20 ? 'text-blue-900' : 'text-gray-700'}`}>Standard Audit</h3>
+                    <p className="text-sm font-medium text-gray-500 mb-4">20 Reviews</p>
+                    <div className={`text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg ${scanDepth === 20 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
+                      ⏱️ ~8 Seconds
+                    </div>
+                  </button>
+
+                  {/* Deep Analysis */}
+                  <button
+                    onClick={() => setScanDepth(50)}
+                    className={`relative flex flex-col items-center p-5 rounded-2xl border-2 transition-all duration-200 ${scanDepth === 50
+                        ? 'border-blue-500 bg-blue-50/50 shadow-lg shadow-blue-100/50 scale-105 z-10'
+                        : 'border-transparent bg-white shadow-sm hover:border-blue-100 hover:bg-gray-50'
+                      }`}
+                  >
+                    {scanDepth === 50 && <div className="absolute -top-3 bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">Selected</div>}
+                    <BrainCircuit size={28} className={`mb-3 ${scanDepth === 50 ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <h3 className={`font-extrabold text-lg mb-1 ${scanDepth === 50 ? 'text-blue-900' : 'text-gray-700'}`}>Deep Analysis</h3>
+                    <p className="text-sm font-medium text-gray-500 mb-4">50 Reviews</p>
+                    <div className={`text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg ${scanDepth === 50 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
+                      ⏱️ ~15 Seconds
+                    </div>
+                  </button>
                 </div>
               </div>
+
             </div>
           ) : (
             <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-6 border border-blue-50 mb-12 text-left">
