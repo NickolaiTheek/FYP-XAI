@@ -43,6 +43,7 @@ interface DashboardData {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'search' | 'live'>('search');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scanDepth, setScanDepth] = useState<number>(20); // NEW: Scan depth state
   const [data, setData] = useState<DashboardData | null>(null);
 
   const [liveText, setLiveText] = useState('');
@@ -59,7 +60,8 @@ export default function Home() {
     if (!searchQuery) return;
     setLoading(true); setError(''); setData(null);
     try {
-      const res = await axios.get(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}`);
+      // NEW: Pass the scanDepth limit to the backend
+      const res = await axios.get(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}&limit=${scanDepth}`);
       setData(res.data);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Could not fetch live reviews. Please try again.");
@@ -108,10 +110,24 @@ export default function Home() {
             </div>
           </div>
           {activeTab === 'search' ? (
-            <div className="max-w-2xl mx-auto bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 mb-12 transition-transform hover:scale-[1.01]">
-              <Search className="text-gray-400 ml-5" size={22} />
-              <input type="text" placeholder=" " className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
-              <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">Search</button>
+            <div className="w-full max-w-2xl mx-auto mb-12">
+              <div className="bg-white rounded-full shadow-2xl p-2 flex items-center border border-blue-50 transition-transform hover:scale-[1.01]">
+                <Search className="text-gray-400 ml-5" size={22} />
+                <input type="text" placeholder=" " className="flex-1 bg-transparent border-none outline-none text-gray-700 text-lg px-4 py-3 placeholder-gray-400" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+                <button onClick={handleSearch} disabled={!searchQuery} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-md disabled:opacity-50">Search</button>
+              </div>
+              
+              {/* NEW: Scan Depth Selector */}
+              <div className="mt-5 flex justify-center items-center gap-3 animate-fade-in-up">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Scan Depth:</span>
+                <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <button onClick={() => setScanDepth(10)} className={`px-4 py-2 text-xs font-bold transition-colors ${scanDepth === 10 ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>Quick (10)</button>
+                  <div className="w-px bg-gray-200"></div>
+                  <button onClick={() => setScanDepth(20)} className={`px-4 py-2 text-xs font-bold transition-colors ${scanDepth === 20 ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>Standard (20)</button>
+                  <div className="w-px bg-gray-200"></div>
+                  <button onClick={() => setScanDepth(50)} className={`px-4 py-2 text-xs font-bold transition-colors ${scanDepth === 50 ? 'bg-blue-50 text-blue-700 flex items-center gap-1' : 'text-gray-600 hover:bg-gray-50 flex items-center gap-1'}`}>Deep (50)</button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-6 border border-blue-50 mb-12 text-left">

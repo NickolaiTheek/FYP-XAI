@@ -101,7 +101,7 @@ def home():
     return {"message": "TrustXplain V2 API is Online 🛡️"}
 
 @app.get("/search")
-def search_restaurant(query: str):
+def search_restaurant(query: str, limit: int = 20):
     if not SERPAPI_KEY:
         raise HTTPException(status_code=500, detail="SerpApi key is missing from .env file")
     
@@ -125,25 +125,40 @@ def search_restaurant(query: str):
         
     if not place_id: raise HTTPException(status_code=404, detail="Could not find this place on Google Maps.")
 
-    # --- PHASE 2: Fetch 20 NEWEST Reviews ---
-    raw_reviews = []
+    # --- PHASE 2: Fetch NEWEST Reviews Dynamically Based on Limit ---
+    valid_reviews = []
     next_page_token = None
     
-    for page in range(2):
+    # Cap at 10 pages (approx 100 raw reviews) to prevent infinite loops and save API credits
+    for page in range(10):
         params_reviews = {"engine": "google_maps_reviews", "place_id": place_id, "hl": "en", "sort_by": "newestFirst", "api_key": SERPAPI_KEY}
         if next_page_token: params_reviews["next_page_token"] = next_page_token
             
         try:
             results_reviews = GoogleSearch(params_reviews).get_dict()
-            raw_reviews.extend(results_reviews.get("reviews", []))
+            fetched_reviews = results_reviews.get("reviews", [])
+            
+            # Pre-filter: Only count reviews that actually have text!
+            for rev in fetched_reviews:
+                text = rev.get("snippet", "")
+                if text and len(text) >= 10:
+                    valid_reviews.append(rev)
+            
             if "serpapi_pagination" in results_reviews and "next_page_token" in results_reviews["serpapi_pagination"]:
                 next_page_token = results_reviews["serpapi_pagination"]["next_page_token"]
-            else: break 
+            else: 
+                break 
+                
+            # Stop paginating if we have collected enough valid text reviews
+            if len(valid_reviews) >= limit:
+                break
+                
         except Exception as e:
             if page == 0: raise HTTPException(status_code=500, detail=f"API Error fetching reviews: {str(e)}")
             else: break 
                 
-    raw_reviews = raw_reviews[:20]
+    # Slice to exact limit requested
+    raw_reviews = valid_reviews[:limit]
     if not raw_reviews: raise HTTPException(status_code=404, detail="This place has no text reviews to analyze.")
 
     # --- PHASE 3: Batch Process through V2 AI Model ---
@@ -192,11 +207,11 @@ def search_restaurant(query: str):
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
     
-    # --- PHASE 4: Authenticity-Gated ABSA via LLM ---
+    
     scorecard_data = []
     if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
-        # 🔥 UPDATED PROMPT: Stitches short, real quotes! 🔥
+        
         prompt = f"""
         You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
         I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
