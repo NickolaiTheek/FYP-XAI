@@ -233,8 +233,7 @@ def search_restaurant(query: str, limit: int = 20):
         {combined_text}
         """
         try:
-            # FIX APPLIED HERE: Changed gemini-2.5-flash to gemini-2.0-flash
-            response = gemini_client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
+            response = gemini_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
             raw_text = response.text.strip()
             
             # BULLETPROOF JSON EXTRACTION
