@@ -17,6 +17,7 @@ interface EvidenceItem { word: string; impact: string; color: string; }
 interface RawExplanationItem { word: string; score: number; }
 interface TrustBadge { label: string; type: string; icon: string; }
 
+// Safely typed to prevent Vercel Build Crashes
 interface ScorecardItem {
   aspect: string;
   score: string;
@@ -92,10 +93,6 @@ export default function Home() {
     return 'bg-gray-300';
   };
 
-  const formatHeading = (text: string) => {
-    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-  };
-
   if (isLanding) {
     return (
       <div className="min-h-screen font-sans bg-[url('/hero-bg.png')] bg-cover bg-bottom bg-no-repeat flex flex-col items-center justify-center p-4">
@@ -130,17 +127,50 @@ export default function Home() {
                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Scan Volume</span>
                 </div>
                 <div className="flex bg-white/70 backdrop-blur-md p-1.5 rounded-2xl border border-gray-200 shadow-sm">
-                  <button onClick={() => setScanDepth(10)} className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 10 ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'}`}>
+                  <button
+                    onClick={() => setScanDepth(10)}
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 10
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
+                      }`}
+                  >
                     <span className="font-bold text-sm">Quick Scan</span>
+                    <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 10 ? 'text-gray-600' : 'text-gray-400'}`}>10 Reviews</span>
+                    <span className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${scanDepth === 10 ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <Clock size={11} /> 3-5 Seconds
+                    </span>
                   </button>
-                  <button onClick={() => setScanDepth(20)} className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 20 ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'}`}>
+
+                  <button
+                    onClick={() => setScanDepth(20)}
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 20
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
+                      }`}
+                  >
                     <span className="font-bold text-sm">Standard</span>
+                    <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 20 ? 'text-gray-600' : 'text-gray-400'}`}>20 Reviews</span>
+                    <span className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${scanDepth === 20 ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <Clock size={11} /> 8-15 Seconds
+                    </span>
                   </button>
-                  <button onClick={() => setScanDepth(50)} className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 50 ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'}`}>
+
+                  <button
+                    onClick={() => setScanDepth(50)}
+                    className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 ${scanDepth === 50
+                        ? 'bg-white text-blue-700 shadow-sm border border-gray-200/50'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 border border-transparent'
+                      }`}
+                  >
                     <span className="font-bold text-sm">Deep Scan</span>
+                    <span className={`text-[10px] font-medium mt-0.5 ${scanDepth === 50 ? 'text-gray-600' : 'text-gray-400'}`}>50 Reviews</span>
+                    <span className={`text-[10px] font-bold mt-1.5 flex items-center gap-1 ${scanDepth === 50 ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <Clock size={11} /> 15-30 Seconds
+                    </span>
                   </button>
                 </div>
               </div>
+
             </div>
           ) : (
             <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-6 border border-blue-50 mb-12 text-left">
@@ -204,12 +234,7 @@ export default function Home() {
             <div className="mb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {data.scorecard.map((item, idx) => {
-                  // --- DEFENSIVE FIX: Now handles both "4.5/5" and "4.5" formats ---
-                  const scoreVal = item.score ? String(item.score) : "0";
-                  const numScore = scoreVal !== "N/A" 
-                    ? parseFloat(scoreVal.includes('/') ? scoreVal.split('/')[0] : scoreVal) 
-                    : 0;
-                  // ---------------------------------------------------------------
+                  const numScore = item.score !== "N/A" ? parseFloat(item.score.split('/')[0]) : 0;
                   const pct = (numScore / 5) * 100;
                   const barColor = getScoreColor(numScore);
                   const isClickable = item.score !== "N/A";
@@ -223,7 +248,7 @@ export default function Home() {
                     >
                       <div>
                         <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-extrabold text-blue-900 text-[13px] uppercase tracking-wider">{formatHeading(item.aspect)}</h4>
+                          <h4 className="font-extrabold text-gray-800 text-sm">{item.aspect}</h4>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
                             item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
                             }`}>
@@ -232,21 +257,24 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-baseline gap-1 mb-2">
-                          <span className="font-black text-2xl text-gray-900">{scoreVal !== "N/A" ? numScore.toFixed(1) : "-"}</span>
-                          {scoreVal !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
+                          <span className="font-black text-2xl text-gray-900">{item.score !== "N/A" ? numScore.toFixed(1) : "-"}</span>
+                          {item.score !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
                         </div>
 
-                        {scoreVal !== "N/A" && (
+                        {item.score !== "N/A" && (
                           <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
                             <div className={`${barColor} h-1.5 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }}></div>
                           </div>
                         )}
                       </div>
 
+                      {/* Authentic Quote Box */}
                       <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2 flex flex-col grow">
                         <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic flex-grow">
                           "{item.short_quote || item.evidence || "Analyzing data..."}"
                         </p>
+
+                        {/* Interactive Hint */}
                         {isClickable && (
                           <div className="flex items-center justify-end gap-1 mt-2 text-blue-500 font-bold text-[10px] uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
                             <ZoomIn size={12} /> View Details
@@ -263,6 +291,7 @@ export default function Home() {
           {/* MIDDLE SECTION: Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 border-t border-b border-gray-200 py-8">
             <MetricCard label="Google Rating" value={`⭐ ${data.stats.google_rating}`} icon={<Star className="text-yellow-500" />} color="yellow" />
+
             <MetricCard
               label="Organic Sentiment"
               value={
@@ -277,10 +306,12 @@ export default function Home() {
               icon={<CheckCircle className="text-green-600" />}
               color="green"
             />
+
             <MetricCard label="High Risk / Synthetic" value={data.stats.fakes} icon={<XCircle className="text-red-600" />} color="red" />
             <MetricCard label="Mismatched Sentiment" value={data.reviews.filter(r => r.is_mismatch).length} icon={<AlertTriangle className="text-orange-600" />} color="orange" />
           </div>
 
+          {/* BOTTOM SECTION: Full Width Raw Feed */}
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-extrabold text-gray-800">Raw Data Feed ({data.stats.total} recent reviews)</h3>
@@ -301,26 +332,49 @@ export default function Home() {
         </main>
       )}
 
+      {/* DETAILED SUMMARY MODAL POPUP */}
       {selectedCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm" onClick={() => setSelectedCard(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col border border-gray-100" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in"
+          onClick={() => setSelectedCard(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col border border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
             <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/80">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-100 text-blue-700 p-2 rounded-lg"><Sparkles size={20} /></div>
+                <div className="bg-blue-100 text-blue-700 p-2 rounded-lg shadow-sm">
+                  <Sparkles size={20} />
+                </div>
                 <div>
-                  <h3 className="font-extrabold text-lg text-gray-900">{formatHeading(selectedCard.aspect)}</h3>
+                  <h3 className="font-extrabold text-lg text-gray-900">{selectedCard.aspect}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-sm font-bold text-gray-700">Score: {selectedCard.score}</span>
                     <span className="text-gray-300">|</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{selectedCard.confidence} Confidence</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                      {selectedCard.confidence} Confidence
+                    </span>
                   </div>
                 </div>
               </div>
-              <button onClick={() => setSelectedCard(null)} className="text-gray-400 hover:text-gray-800"><X size={20} /></button>
+              <button
+                onClick={() => setSelectedCard(null)}
+                className="text-gray-400 hover:text-gray-800 bg-gray-200/50 hover:bg-gray-200 p-2 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
+
+            {/* Modal Body */}
             <div className="p-6 bg-white">
-              <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Info size={14} className="text-blue-400" /> Detailed Insight Summary</h4>
-              <p className="text-gray-700 leading-relaxed text-[15px]">{selectedCard.detailed_summary || selectedCard.short_quote || selectedCard.evidence || "No detailed summary available."}</p>
+              <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Info size={14} className="text-blue-400" /> Detailed Insight Summary
+              </h4>
+              <p className="text-gray-700 leading-relaxed text-[15px]">
+                {selectedCard.detailed_summary || selectedCard.short_quote || selectedCard.evidence || "No detailed summary available for this aspect."}
+              </p>
             </div>
           </div>
         </div>
@@ -329,8 +383,15 @@ export default function Home() {
   );
 }
 
+// --- COMPONENTS ---
 function MetricCard({ label, value, icon, color }: any) {
-  const colors: any = { blue: "bg-blue-50 border-blue-200", green: "bg-green-50 border-green-200", red: "bg-red-50 border-red-200", orange: "bg-orange-50 border-orange-200", yellow: "bg-yellow-50 border-yellow-200" };
+  const colors: any = {
+    blue: "bg-blue-50 border-blue-200",
+    green: "bg-green-50 border-green-200",
+    red: "bg-red-50 border-red-200",
+    orange: "bg-orange-50 border-orange-200",
+    yellow: "bg-yellow-50 border-yellow-200"
+  };
   return (
     <div className={`p-6 rounded-2xl border ${colors[color]} text-center shadow-sm`}>
       <div className="flex justify-center mb-3 scale-110">{icon}</div>
@@ -343,6 +404,7 @@ function MetricCard({ label, value, icon, color }: any) {
 function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
   const [report, setReport] = useState<AuditReport | null>(null);
   const [loading, setLoading] = useState(false);
+
   const handleExplain = async () => {
     setLoading(true);
     try {
@@ -351,12 +413,13 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
     } catch (err) { alert("Analysis failed."); }
     setLoading(false);
   };
+
   return (
     <div className={`bg-white p-6 rounded-2xl border shadow-sm transition-all ${review.is_fake ? 'border-red-200 bg-red-50/20' : 'border-gray-200 hover:border-blue-200'}`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
-          <span className={`px-3 py-1.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider ${review.is_fake ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-            {review.is_fake ? "⚠️ High Risk" : "✅ Verified Organic"}
+          <span className={`px-3 py-1.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider shadow-sm ${review.is_fake ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
+            {review.is_fake ? "⚠️ High Risk / Promotional" : "✅ Verified Organic"}
           </span>
           <div className="flex text-yellow-400">
             {[...Array(5)].map((_, i) => (<Star key={i} size={16} fill={i < review.stars ? "currentColor" : "none"} />))}
@@ -365,9 +428,7 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
         <div className="flex flex-col items-end">
           <span className="text-sm font-bold text-gray-800">{review.author}</span>
           {review.date && (
-            <span className="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mt-1">
-              {review.date}
-            </span>
+            <span className="text-xs font-medium text-gray-400 mt-1">{review.date}</span>
           )}
         </div>
       </div>
