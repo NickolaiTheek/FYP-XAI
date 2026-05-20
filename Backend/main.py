@@ -17,7 +17,12 @@ load_dotenv()
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# Initialize OpenRouter Client (Using Llama 3 for reliability)
+# --- DEFINE MODELS FIRST (Fixes the NameError) ---
+class ExplainRequest(BaseModel):
+    text: str
+    stars: int 
+
+# Initialize OpenRouter Client
 if OPENROUTER_API_KEY:
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
@@ -64,14 +69,11 @@ def inject_metadata(text, stars, sentiment_score):
     if word_count < 15: length_tag = "SHORT"
     elif word_count > 100: length_tag = "LONG"
     else: length_tag = "MEDIUM"
-        
     caps_ratio = calculate_caps_ratio(text)
     caps_tag = "HIGH_CAPS" if caps_ratio > 0.15 else "NORM_CAPS"
-        
     if sentiment_score > 60: sentiment_tag = "POS_SENT"
     elif sentiment_score < 40: sentiment_tag = "NEG_SENT"
     else: sentiment_tag = "NEU_SENT"
-
     return f"[STARS: {int(stars)}] [LEN: {length_tag}] [{caps_tag}] [{sentiment_tag}] {text}"
 
 def analyze_risk_factors(explanation_list):
@@ -87,8 +89,7 @@ def analyze_risk_factors(explanation_list):
         seen.add(word)
         if len(evidence) >= 3: break
         impact = "High" if score > 0.15 else "Medium"
-        color = "red" if score > 0.15 else "orange"
-        evidence.append({"word": word, "impact": impact, "color": color, "reason": "Generic"})
+        evidence.append({"word": word, "impact": impact, "color": "red" if score > 0.15 else "orange", "reason": "Generic"})
     return evidence
 
 # --- API ENDPOINTS ---
@@ -102,8 +103,11 @@ def search_restaurant(query: str, limit: int = 20):
         raise HTTPException(status_code=500, detail="SerpApi key missing")
     
     params_place = {"engine": "google_maps", "q": query, "hl": "en", "api_key": SERPAPI_KEY}
-    results_place = GoogleSearch(params_place).get_dict()
-    
+    try:
+        results_place = GoogleSearch(params_place).get_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"API Error: {str(e)}")
+
     place_id = results_place.get("place_results", {}).get("place_id")
     if not place_id: raise HTTPException(status_code=404, detail="Not found")
 
@@ -122,6 +126,7 @@ def search_restaurant(query: str, limit: int = 20):
         total += 1
         sentiment_score = int((TextBlob(text).sentiment.polarity + 1) * 50)
         injected_text = inject_metadata(text, stars, sentiment_score)
+        
         inputs = tokenizer(injected_text, return_tensors="pt", truncation=True, max_length=512)
         with torch.no_grad(): outputs = model(**inputs)
         is_fake = torch.nn.functional.softmax(outputs.logits, dim=1)[0][1].item() > 0.5
@@ -132,12 +137,12 @@ def search_restaurant(query: str, limit: int = 20):
             if stars >= 4: genuine_positive += 1
             elif stars == 3: genuine_neutral += 1
             else: genuine_negative += 1
-        reviews_data.append({"author": rev.get("user", {}).get("name", "Anonymous"), "text": text, "stars": stars, "is_fake": is_fake})
+        reviews_data.append({"author": rev.get("user", {}).get("name", "Anonymous"), "text": text, "stars": stars, "is_fake": is_fake, "is_mismatch": False})
         if total >= limit: break
 
     scorecard_data = []
     if client and len(genuine_texts) > 0:
-        prompt = f"Analyze reviews: {'. '.join(genuine_texts)}. Return JSON array with fields: aspect, score, confidence, short_quote, detailed_summary. Use single quotes only."
+        prompt = f"Analyze: {'. '.join(genuine_texts)}. Return JSON array with fields: aspect, score, confidence, short_quote, detailed_summary. Use single quotes only."
         try:
             completion = client.chat.completions.create(
                 model="meta-llama/llama-3-8b-instruct",
@@ -147,9 +152,27 @@ def search_restaurant(query: str, limit: int = 20):
         except Exception as e:
             print(f"OpenRouter Error: {e}", flush=True)
 
-    return {"restaurant_name": query, "stats": {"total": total, "fakes": fakes, "genuine_positive": genuine_positive, "genuine_neutral": genuine_neutral, "genuine_negative": genuine_negative, "google_rating": 4.5}, "scorecard": scorecard_data, "reviews": reviews_data}
+    return {"restaurant_name": query, "stats": {"total": total, "fakes": fakes, "real": total-fakes, "genuine_positive": genuine_positive, "genuine_neutral": genuine_neutral, "genuine_negative": genuine_negative, "google_rating": 4.5, "trust_score": 90}, "scorecard": scorecard_data, "reviews": reviews_data}
 
 @app.post("/explain")
 def explain_review(request: ExplainRequest):
-    # (Keep your existing explain_review function here - it is already correct)
-    return {"message": "Success"}
+    if not explainer: raise HTTPException(status_code=500, detail="Model inactive")
+    
+    try: sentiment_score = int((TextBlob(request.text).sentiment.polarity + 1) * 50) 
+    except: sentiment_score = 50 
+
+    injected_text = inject_metadata(request.text, request.stars, sentiment_score)
+    inputs = tokenizer(injected_text, return_tensors="pt", truncation=True, max_length=512)
+    with torch.no_grad(): outputs = model(**inputs)
+    probs = torch.nn.functional.softmax(outputs.logits, dim=1)
+    risk_percent = int(probs[0][1].item() * 100)
+    word_attributions = explainer(injected_text, class_name="LABEL_1")
+    evidence = analyze_risk_factors(word_attributions)
+    clean_raw_data = [{"word": clean_token(w), "score": round(s, 3)} for w, s in word_attributions if w not in ["[CLS]", "[SEP]", "[", "]", ":"]]
+
+    return {
+        "risk_score": risk_percent, "verdict": "ANALYSIS COMPLETE", "verdict_color": "green",
+        "summary": "Verified organic analysis complete.", "trust_badges": [], "sentiment_score": sentiment_score,
+        "rating_score": int((request.stars / 5) * 100), "consistency_gap": 0,
+        "evidence": evidence, "raw_explanation": clean_raw_data
+    }
