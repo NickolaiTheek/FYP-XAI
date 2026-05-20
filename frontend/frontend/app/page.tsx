@@ -234,7 +234,12 @@ export default function Home() {
             <div className="mb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {data.scorecard.map((item, idx) => {
-                  const numScore = item.score !== "N/A" ? parseFloat(item.score.split('/')[0]) : 0;
+                  // --- DEFENSIVE FIX APPLIED HERE ---
+                  const scoreVal = item.score ? String(item.score) : "0";
+                  const numScore = scoreVal !== "N/A" 
+                    ? parseFloat(scoreVal.includes('/') ? scoreVal.split('/')[0] : scoreVal) 
+                    : 0;
+                  // ----------------------------------
                   const pct = (numScore / 5) * 100;
                   const barColor = getScoreColor(numScore);
                   const isClickable = item.score !== "N/A";
@@ -257,11 +262,11 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-baseline gap-1 mb-2">
-                          <span className="font-black text-2xl text-gray-900">{item.score !== "N/A" ? numScore.toFixed(1) : "-"}</span>
-                          {item.score !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
+                          <span className="font-black text-2xl text-gray-900">{scoreVal !== "N/A" ? numScore.toFixed(1) : "-"}</span>
+                          {scoreVal !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
                         </div>
 
-                        {item.score !== "N/A" && (
+                        {scoreVal !== "N/A" && (
                           <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
                             <div className={`${barColor} h-1.5 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }}></div>
                           </div>
