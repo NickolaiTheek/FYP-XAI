@@ -11,3 +11,4 @@ python-dotenv
 google-genai
 protobuf
 sentencepiece
+openai
