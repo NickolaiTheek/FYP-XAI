@@ -233,7 +233,8 @@ def search_restaurant(query: str, limit: int = 20):
         {combined_text}
         """
         try:
-            response = gemini_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+            # FIX 1: Switched to gemini-1.5-flash for the 1,500 daily requests limit
+            response = gemini_client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
             raw_text = response.text.strip()
             
             # BULLETPROOF JSON EXTRACTION
@@ -241,11 +242,12 @@ def search_restaurant(query: str, limit: int = 20):
             if json_match:
                 scorecard_data = json.loads(json_match.group(0))
             else:
-                print("Failed to find JSON array in response")
+                print("Failed to find JSON array in response", flush=True)
                 scorecard_data = []
                 
         except Exception as e:
-            print("Gemini API/JSON Parse Error:", e)
+            # FIX 2: Added flush=True so errors immediately appear in Hugging Face Logs
+            print("Gemini API/JSON Parse Error:", e, flush=True)
             scorecard_data = []
 
     return {
