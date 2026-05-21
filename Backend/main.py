@@ -10,31 +10,19 @@ import json
 import re
 from dotenv import load_dotenv
 from serpapi import GoogleSearch
-from openai import OpenAI
+from google import genai
 
 # --- LOAD ENVIRONMENT VARIABLES ---
 load_dotenv()
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# --- DEFINE PYDANTIC MODELS AT TOP ---
-class ExplainRequest(BaseModel):
-    text: str
-    stars: int 
-
-# Initialize OpenRouter Client Safely
-if OPENROUTER_API_KEY:
-    try:
-        llm_client = OpenAI(
-            base_url="https://openrouter.ai/api/v1/", # FIX: Added trailing slash for absolute URL
-            api_key=OPENROUTER_API_KEY,
-        )
-    except Exception as e:
-        print(f"Failed to init OpenAI client: {e}")
-        llm_client = None
+# Initialize Gemini Client
+if GEMINI_API_KEY:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    llm_client = None
-    print("⚠️ OPENROUTER_API_KEY not found. Summarization will be disabled.")
+    gemini_client = None
+    print("⚠️ GEMINI_API_KEY not found. Summarization will be disabled.")
 
 app = FastAPI()
 
@@ -215,53 +203,49 @@ def search_restaurant(query: str, limit: int = 20):
     real = total - fakes
     trust_score = int(((total - fakes) / total) * 100)
     
+    
     scorecard_data = []
-    if llm_client and len(genuine_texts) > 0:
+    if gemini_client and len(genuine_texts) > 0:
         combined_text = "\n".join(genuine_texts)
         
         prompt = f"""
         You are an AI data extractor. Analyze the following VERIFIED AUTHENTIC reviews.
         I need an aspect-based scorecard for these 5 categories: "Food Quality", "Service", "Hygiene", "Atmosphere", "Value for Money".
         
-        Return ONLY a raw JSON array. DO NOT wrap the output in markdown blocks (e.g. ```json). DO NOT include introductory text.
+        Return ONLY a raw JSON array. Do not include markdown formatting, backticks, or extra text.
         Format EXACTLY like this:
         [
           {{
             "aspect": "Food Quality", 
             "score": "4.5/5", 
             "confidence": "High", 
-            "short_quote": "Praised for lovely food though one noted grease.",
-            "detailed_summary": "Most customers highly praised the taste and portion sizes. However, a few isolated reviews mentioned minor inconsistencies."
+            "short_quote": "Praised for 'lovely tasty' food, though one noted 'pile of grease'.",
+            "detailed_summary": "Most customers highly praised the taste and portion sizes, noting the pizza was large and delicious. However, a few isolated reviews mentioned occasional greasiness or minor inconsistencies in temperature."
           }}
         ]
         
         CRITICAL RULES:
-        1. 'short_quote': MUST be under 15 words.
-        2. 'detailed_summary': MUST be a 30-40 word comprehensive summary.
+        1. 'short_quote': MUST be under 15 words. Stitch together 1 to 3 impactful quoted phrases to capture the authentic user voice.
+        2. 'detailed_summary': MUST be a 30-40 word comprehensive summary combining multiple customer opinions. Write in a professional, analytical tone.
         3. If an aspect is not mentioned enough to score, set score to "N/A", confidence to "Low", and both text fields to "Not enough data".
-        4. ABSOLUTELY NO DOUBLE QUOTES inside your JSON values. If you quote a user, use single quotes ('). Using inner double quotes will break the system.
         
         Reviews:
         {combined_text}
         """
         try:
-            # Using Llama 3 8B via OpenRouter for high reliability and JSON parsing
-            response = llm_client.chat.completions.create(
-                model="meta-llama/llama-3-8b-instruct:free",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            raw_text = response.choices[0].message.content.strip()
+            response = gemini_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+            raw_text = response.text.strip()
             
             # BULLETPROOF JSON EXTRACTION
             json_match = re.search(r'\[.*\]', raw_text, re.DOTALL)
             if json_match:
                 scorecard_data = json.loads(json_match.group(0))
             else:
-                print("Failed to find JSON array in response. Raw text:", raw_text, flush=True)
+                print("Failed to find JSON array in response")
                 scorecard_data = []
                 
         except Exception as e:
-            print(f"OpenRouter API/JSON Parse Error: {e}", flush=True)
+            print("Gemini API/JSON Parse Error:", e)
             scorecard_data = []
 
     return {
@@ -274,6 +258,10 @@ def search_restaurant(query: str, limit: int = 20):
         "scorecard": scorecard_data,
         "reviews": reviews_data
     }
+
+class ExplainRequest(BaseModel):
+    text: str
+    stars: int 
 
 @app.post("/explain")
 def explain_review(request: ExplainRequest):
@@ -345,3 +333,4 @@ def explain_review(request: ExplainRequest):
         "rating_score": rating_score, "consistency_gap": consistency_gap,
         "evidence": evidence, "raw_explanation": clean_raw_data
     }
+
