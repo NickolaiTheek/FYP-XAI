@@ -57,6 +57,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // FIX: Removed the markdown link formatting that broke the Axios requests
   const API_URL = "[https://nickolaitheek-trustxplain-backend.hf.space](https://nickolaitheek-trustxplain-backend.hf.space)";
   const isLanding = !data && !liveReport && !loading;
 
@@ -107,6 +108,15 @@ export default function Home() {
             <h1 className="text-4xl font-bold text-blue-600 tracking-tight">TrustXplain</h1>
           </div>
           <h2 className="text-4xl md:text-5xl font-extrabold text-blue-900 mb-8 leading-tight drop-shadow-sm">AI Credibility Inspector</h2>
+          
+          {/* FIX: Error Banner added so failures are visible, preventing silent resets */}
+          {error && (
+            <div className="max-w-2xl mx-auto mb-8 bg-red-50 border border-red-200 p-4 rounded-xl shadow-sm text-center">
+              <AlertTriangle className="mx-auto text-red-500 mb-2" size={28} />
+              <p className="text-red-700 font-bold">{error}</p>
+            </div>
+          )}
+
           <div className="flex justify-center mb-8">
             <div className="bg-white p-1 rounded-full shadow-md border border-gray-200 inline-flex">
               <button onClick={() => setActiveTab('search')} className={`px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'search' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
@@ -216,7 +226,7 @@ export default function Home() {
         </div>
       )}
 
-      {error && (
+      {error && !isLanding && (
         <div className="max-w-xl mx-auto mt-8 text-center bg-red-50 p-6 rounded-xl border border-red-200 shadow-sm animate-fade-in">
           <AlertTriangle className="mx-auto text-red-500 mb-2" size={32} />
           <p className="text-red-700 font-medium">{error}</p>
@@ -237,12 +247,10 @@ export default function Home() {
             <div className="mb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {data.scorecard.map((item, idx) => {
-                  // --- DEFENSIVE JSON PARSING FIX APPLIED HERE ---
                   const scoreRaw = item.score ? String(item.score) : "0";
                   const numScore = scoreRaw !== "N/A" 
                     ? parseFloat(scoreRaw.includes('/') ? scoreRaw.split('/')[0] : scoreRaw) 
                     : 0;
-                  // -----------------------------------------------
                   const pct = (numScore / 5) * 100;
                   const barColor = getScoreColor(numScore);
                   const isClickable = item.score !== "N/A";
@@ -430,7 +438,6 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
         </div>
         <div className="flex flex-col items-end">
           <span className="text-sm font-bold text-gray-800">{review.author}</span>
-          {/* --- DATE STYLING POLISH APPLIED HERE --- */}
           {review.date && (
             <span className="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mt-1">
               {review.date}

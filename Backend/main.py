@@ -22,12 +22,16 @@ class ExplainRequest(BaseModel):
     text: str
     stars: int 
 
-# Initialize OpenRouter Client
+# Initialize OpenRouter Client Safely
 if OPENROUTER_API_KEY:
-    llm_client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OPENROUTER_API_KEY,
-    )
+    try:
+        llm_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1/", # FIX: Added trailing slash for absolute URL
+            api_key=OPENROUTER_API_KEY,
+        )
+    except Exception as e:
+        print(f"Failed to init OpenAI client: {e}")
+        llm_client = None
 else:
     llm_client = None
     print("⚠️ OPENROUTER_API_KEY not found. Summarization will be disabled.")
