@@ -17,7 +17,6 @@ interface EvidenceItem { word: string; impact: string; color: string; }
 interface RawExplanationItem { word: string; score: number; }
 interface TrustBadge { label: string; type: string; icon: string; }
 
-// Safely typed to prevent Vercel Build Crashes
 interface ScorecardItem {
   aspect: string;
   score: string;
@@ -49,7 +48,6 @@ export default function Home() {
   const [scanDepth, setScanDepth] = useState<number>(20);
   const [data, setData] = useState<DashboardData | null>(null);
 
-  // Modal State
   const [selectedCard, setSelectedCard] = useState<ScorecardItem | null>(null);
 
   const [liveText, setLiveText] = useState('');
@@ -59,7 +57,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const API_URL = "https://nickolaitheek-trustxplain-backend.hf.space";
+  const API_URL = "[https://nickolaitheek-trustxplain-backend.hf.space](https://nickolaitheek-trustxplain-backend.hf.space)";
   const isLanding = !data && !liveReport && !loading;
 
   const handleSearch = async () => {
@@ -91,6 +89,11 @@ export default function Home() {
     if (score >= 2.5) return 'bg-yellow-400';
     if (score > 0) return 'bg-red-500';
     return 'bg-gray-300';
+  };
+
+  // UI Polish: Ensures headings always look clean (e.g. "service" -> "Service")
+  const formatHeading = (text: string) => {
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   };
 
   if (isLanding) {
@@ -234,7 +237,12 @@ export default function Home() {
             <div className="mb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {data.scorecard.map((item, idx) => {
-                  const numScore = item.score !== "N/A" ? parseFloat(item.score.split('/')[0]) : 0;
+                  // --- DEFENSIVE JSON PARSING FIX APPLIED HERE ---
+                  const scoreRaw = item.score ? String(item.score) : "0";
+                  const numScore = scoreRaw !== "N/A" 
+                    ? parseFloat(scoreRaw.includes('/') ? scoreRaw.split('/')[0] : scoreRaw) 
+                    : 0;
+                  // -----------------------------------------------
                   const pct = (numScore / 5) * 100;
                   const barColor = getScoreColor(numScore);
                   const isClickable = item.score !== "N/A";
@@ -248,7 +256,7 @@ export default function Home() {
                     >
                       <div>
                         <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-extrabold text-gray-800 text-sm">{item.aspect}</h4>
+                          <h4 className="font-extrabold text-blue-900 text-[13px] uppercase tracking-wider">{formatHeading(item.aspect)}</h4>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${item.confidence === 'High' ? 'bg-blue-50 text-blue-600' :
                             item.confidence === 'Medium' ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-500'
                             }`}>
@@ -257,24 +265,21 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-baseline gap-1 mb-2">
-                          <span className="font-black text-2xl text-gray-900">{item.score !== "N/A" ? numScore.toFixed(1) : "-"}</span>
-                          {item.score !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
+                          <span className="font-black text-2xl text-gray-900">{scoreRaw !== "N/A" ? numScore.toFixed(1) : "-"}</span>
+                          {scoreRaw !== "N/A" && <span className="text-gray-400 text-sm font-bold">/5</span>}
                         </div>
 
-                        {item.score !== "N/A" && (
+                        {scoreRaw !== "N/A" && (
                           <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
                             <div className={`${barColor} h-1.5 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }}></div>
                           </div>
                         )}
                       </div>
 
-                      {/* Authentic Quote Box */}
                       <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-2 flex flex-col grow">
                         <p className="text-sm text-gray-700 font-medium line-clamp-3 leading-snug italic flex-grow">
                           "{item.short_quote || item.evidence || "Analyzing data..."}"
                         </p>
-
-                        {/* Interactive Hint */}
                         {isClickable && (
                           <div className="flex items-center justify-end gap-1 mt-2 text-blue-500 font-bold text-[10px] uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity">
                             <ZoomIn size={12} /> View Details
@@ -342,14 +347,13 @@ export default function Home() {
             className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col border border-gray-100"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50/80">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-100 text-blue-700 p-2 rounded-lg shadow-sm">
                   <Sparkles size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-lg text-gray-900">{selectedCard.aspect}</h3>
+                  <h3 className="font-extrabold text-lg text-gray-900">{formatHeading(selectedCard.aspect)}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-sm font-bold text-gray-700">Score: {selectedCard.score}</span>
                     <span className="text-gray-300">|</span>
@@ -367,7 +371,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 bg-white">
               <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                 <Info size={14} className="text-blue-400" /> Detailed Insight Summary
@@ -427,8 +430,11 @@ function ReviewCard({ review, apiUrl }: { review: Review, apiUrl: string }) {
         </div>
         <div className="flex flex-col items-end">
           <span className="text-sm font-bold text-gray-800">{review.author}</span>
+          {/* --- DATE STYLING POLISH APPLIED HERE --- */}
           {review.date && (
-            <span className="text-xs font-medium text-gray-400 mt-1">{review.date}</span>
+            <span className="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full mt-1">
+              {review.date}
+            </span>
           )}
         </div>
       </div>
